@@ -155,7 +155,7 @@ export class TelegramAdapter implements ChannelAdapter {
     const chatId = envelope.channel_user_id
     // 私聊中 channel_user_id == chat_id
     await this.bot.api.sendMessage(chatId, text)
-    console.log(`[Telegram] Sent to ${chatId}: ${text.slice(0, 60)}...`)
+    console.error(`[Telegram] Sent to ${chatId}: ${text.slice(0, 60)}...`)
   }
 
   /** 注册入站消息回调 */
@@ -167,12 +167,12 @@ export class TelegramAdapter implements ChannelAdapter {
   async start(): Promise<void> {
     if (this.running) return
     this.running = true
-    console.log('[Telegram] Starting polling...')
+    console.error('[Telegram] Starting polling...')
 
     // grammy bot.start() 启动长轮询
     // 使用 catch 处理断线重连
     this.bot.start({
-      onStart: () => console.log('[Telegram] Polling started'),
+      onStart: () => console.error('[Telegram] Polling started'),
       drop_pending_updates: true,
       timeout: this.options.pollingTimeout ?? 10,
     }).catch(err => {
@@ -190,6 +190,6 @@ export class TelegramAdapter implements ChannelAdapter {
     this.running = false
     await this.bot.stop()
     this.releasePid()
-    console.log('[Telegram] Stopped')
+    console.error('[Telegram] Stopped')
   }
 }

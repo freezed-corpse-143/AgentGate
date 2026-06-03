@@ -145,7 +145,7 @@ export function loadConfig(): AgentGateConfig {
       } else {
         fileConfig = loadYaml(raw) as Partial<AgentGateConfig>
       }
-      console.log(`[Config] Loaded from ${configPath}`)
+      console.error(`[Config] Loaded from ${configPath}`)
     } catch (err) {
       console.warn(`[Config] Failed to load ${configPath}: ${err}`)
     }

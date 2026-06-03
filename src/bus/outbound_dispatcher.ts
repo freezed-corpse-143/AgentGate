@@ -23,7 +23,7 @@ export class OutboundDispatcher {
     bus.subscribeWildcard('agent.*.outbound', async (envelope, topic) => {
       await this.dispatch(envelope)
     })
-    console.log('[Dispatcher] Attached to bus — listening on agent.*.outbound')
+    console.error('[Dispatcher] Attached to bus — listening on agent.*.outbound')
   }
 
   /** 分发一条出站 Envelope */
@@ -36,7 +36,7 @@ export class OutboundDispatcher {
 
     try {
       await adapter.send(envelope)
-      console.log(`[Dispatcher] Dispatched ${envelope.message_id} → ${envelope.channel}`)
+      console.error(`[Dispatcher] Dispatched ${envelope.message_id} → ${envelope.channel}`)
     } catch (err) {
       console.error(`[Dispatcher] Failed to dispatch ${envelope.message_id}: ${err}`)
     }

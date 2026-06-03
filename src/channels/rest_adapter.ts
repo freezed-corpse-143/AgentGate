@@ -124,7 +124,7 @@ export class RESTAdapter implements ChannelAdapter {
     this.wss = new WebSocketServer({ server: this.httpServer, path: '/v1/stream' })
     this.wss.on('connection', (ws) => {
       this.wsClients.add(ws)
-      console.log('[REST] WebSocket client connected')
+      console.error('[REST] WebSocket client connected')
 
       ws.on('message', (data) => {
         try {
@@ -137,14 +137,14 @@ export class RESTAdapter implements ChannelAdapter {
 
       ws.on('close', () => {
         this.wsClients.delete(ws)
-        console.log('[REST] WebSocket client disconnected')
+        console.error('[REST] WebSocket client disconnected')
       })
     })
 
     return new Promise((resolve) => {
       this.httpServer!.listen(port, host, () => {
-        console.log(`[REST] Server listening on http://${host}:${port}`)
-        console.log(`[REST] WebSocket on ws://${host}:${port}/v1/stream`)
+        console.error(`[REST] Server listening on http://${host}:${port}`)
+        console.error(`[REST] WebSocket on ws://${host}:${port}/v1/stream`)
         resolve()
       })
     })
@@ -286,12 +286,12 @@ export class RESTAdapter implements ChannelAdapter {
     res.write(`data: ${JSON.stringify({ type: 'connected', timestamp: new Date().toISOString() })}\n\n`)
 
     this.sseClients.add(res)
-    console.log('[REST] SSE client connected')
+    console.error('[REST] SSE client connected')
 
     // 客户端断开时清理
     _req.on('close', () => {
       this.sseClients.delete(res)
-      console.log('[REST] SSE client disconnected')
+      console.error('[REST] SSE client disconnected')
     })
   }
 

@@ -61,7 +61,7 @@ export class ConversationSync {
       this.handleRemoteSync(envelope)
     })
 
-    console.log('[ConversationSync] Started — listening on _system.conversation.sync')
+    console.error('[ConversationSync] Started — listening on _system.conversation.sync')
   }
 
   /** 本地追加消息 → 广播到远端 */

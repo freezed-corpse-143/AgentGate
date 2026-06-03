@@ -49,7 +49,7 @@ export class SSHAdapter implements ChannelAdapter {
       this.server = new SshServer({ hostKeys: [hostKey] }, (client: Connection) => this.handleClient(client))
       this.server.on('error', (err: Error) => { console.error(`[SSH] ${err.message}`); if (!this.running) reject(err) })
       this.server.listen(this.options.port, this.options.host ?? '0.0.0.0', () => {
-        console.log(`[SSH] Listening on ${this.options.host ?? '0.0.0.0'}:${this.options.port}`)
+        console.error(`[SSH] Listening on ${this.options.host ?? '0.0.0.0'}:${this.options.port}`)
         resolve()
       })
     })

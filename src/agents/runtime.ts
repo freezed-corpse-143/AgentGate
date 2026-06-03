@@ -66,7 +66,7 @@ export class AgentRuntime {
     const agents = this.handlers.size > 0
       ? `agents: [${[...this.handlers.keys()].join(', ')}]`
       : 'all agents (no handlers registered)'
-    console.log(`[AgentRuntime] Started — listening on agent.*.inbound (${agents})`)
+    console.error(`[AgentRuntime] Started — listening on agent.*.inbound (${agents})`)
   }
 
   /** 记录消息到 ConversationStore */
@@ -178,7 +178,7 @@ export class AgentRuntime {
       if (targetAgent && targetAgent !== envelope.agent_id) {
         // 跨 Agent 路由: 更新 agent_id 为目标 Agent，然后发布到目标 inbound
         response.agent_id = targetAgent
-        console.log(
+        console.error(
           `[AgentRuntime] Routing ${envelope.message_id} → ${targetAgent} ` +
           `(hop ${(response.route_history ?? []).length})`,
         )

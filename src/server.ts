@@ -83,9 +83,9 @@ export async function startServer(config: AgentGateConfig, opts?: ServerOptions)
     for (const adapter of adapters) {
       await adapter.start()
     }
-    console.log('[AgentGate] Server started')
+    console.error('[AgentGate] Server started')
   } else {
-    console.log('[AgentGate] Server started (headless)')
+    console.error('[AgentGate] Server started (headless)')
   }
 
   let bridge: BridgeAgent | null = null
@@ -94,11 +94,11 @@ export async function startServer(config: AgentGateConfig, opts?: ServerOptions)
     bridge = new BridgeAgent({ agentId: config.server.defaultAgent, bus, registryHost: config.bridge.host, registryPort: config.bridge.port })
     await bridge.start()
     conversationSync = new ConversationSync(bus, conversationStore)
-    console.log(`[AgentGate]   Bridge v2: agent=${config.server.defaultAgent} port=${bridge.port}`)
+    console.error(`[AgentGate]   Bridge v2: agent=${config.server.defaultAgent} port=${bridge.port}`)
   }
 
   const shutdown = async () => {
-    console.log('[AgentGate] Shutting down...')
+    console.error('[AgentGate] Shutting down...')
     if (conversationSync) conversationSync.stop()
     if (bridge) bridge.stop()
     for (const adapter of adapters) { try { await adapter.stop() } catch {} }

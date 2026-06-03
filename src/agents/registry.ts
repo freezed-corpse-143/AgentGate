@@ -12,13 +12,13 @@ export class AgentRegistry {
   /** 注册 Agent */
   register(spec: AgentSpec): void {
     this.agents.set(spec.agent_id, spec)
-    console.log(`[AgentRegistry] Registered: ${spec.agent_id} (${spec.name})`)
+    console.error(`[AgentRegistry] Registered: ${spec.agent_id} (${spec.name})`)
   }
 
   /** 注销 Agent */
   unregister(agentId: string): boolean {
     const existed = this.agents.delete(agentId)
-    if (existed) console.log(`[AgentRegistry] Unregistered: ${agentId}`)
+    if (existed) console.error(`[AgentRegistry] Unregistered: ${agentId}`)
     return existed
   }
 
