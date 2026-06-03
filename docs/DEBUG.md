@@ -11,8 +11,8 @@
 ```
 □ Node.js 24+ 已安装
 □ npm run build 成功（node_modules\.bin\tsc.cmd）
-□ dist → agentgate-plugin/dist/ 已同步
-□ agentgate-plugin/node_modules/ 已安装
+□ npm run build 成功
+□ node_modules/ 已安装
 □ ~/.claude.json 已配置 mcpServers.agentgate（含 --agent-id ${AGENTGATE_DEFAULT_AGENT}）
 □ ~/.claude.json 包含 tengu_harbor: true
 ```
@@ -65,10 +65,10 @@ node dist/mcp_server.js
 
 | 原因 | 检查方法 | 解决 |
 |------|---------|------|
-| 插件目录不存在 | `dir agentgate-plugin` | 确认路径正确 |
-| 缺少 node_modules | `dir agentgate-plugin\node_modules` | `npm install --prefix agentgate-plugin` |
-| 缺少 dist | `dir agentgate-plugin\dist\mcp_server.js` | `npm run build && Copy-Item -Recurse -Force dist/* agentgate-plugin/dist/` |
-| MCP Server 启动报错 | 直接运行 `node agentgate-plugin/dist/mcp_server.js` 看报错 | 修复报错 |
+| dist 不存在 | `dir dist\mcp_server.js` | 确认项目已构建 |
+| 缺少 node_modules | `dir node_modules` | `npm install` |
+| 缺少 dist | `dir dist\mcp_server.js` | `npm run build` |
+| MCP Server 启动报错 | 直接运行 `node dist/mcp_server.js` 看报错 | 修复报错 |
 
 ### 2.2 Bridge 无法连接
 
@@ -196,7 +196,7 @@ Remove-Item -Recurse -Force $env:USERPROFILE\.agentgate\conversations\
 
 ```bash
 # 模拟 Claude 启动 MCP Server
-node agentgate-plugin/dist/mcp_server.js 2>&1
+node dist/mcp_server.js 2>&1
 
 # 如果输出中不包含 "[AgentGate MCP] Running"
 # 说明启动过程有错误
@@ -206,7 +206,7 @@ node agentgate-plugin/dist/mcp_server.js 2>&1
 
 | 错误 | 原因 | 解决 |
 |------|------|------|
-| `Cannot find module 'ssh2'` | 插件目录缺少 node_modules | `npm install --prefix agentgate-plugin` |
+| `Cannot find module 'ssh2'` | 缺少 node_modules | `npm install` |
 | `import { Server as SshServer }` 语法错 | ssh2 的 CommonJS 兼容问题 | 确认使用 `import ssh2 from 'ssh2'` 模式 |
 | `ERR_SOCKET_BAD_PORT` | commander.js parseInt radix 问题 | 确认 CLI 使用 `(v) => parseInt(v, 10)` |
 
@@ -334,7 +334,7 @@ Server.notification({ method, params })
 ~/.agentgate/conversations/
   → JSON 文件，每个对话一个文件
 
-C:\Projects\AgentGate\agentgate-plugin\.mcp.json
+C:\Projects\AgentGate\.mcp.json
   → 指向 dist/mcp_server.js
 ```
 
@@ -379,11 +379,10 @@ Remove-Item -Recurse -Force $env:USERPROFILE\.agentgate\ -ErrorAction SilentlyCo
 # 4. 重新构建
 cd C:\Projects\AgentGate
 npm run build
-Copy-Item -Recurse -Force dist/* agentgate-plugin/dist/
 
 # 5. 设置 agent_id
 echo agent-alpha > $env:USERPROFILE\.agentgate\agent_id
 
 # 6. 启动 Claude
-claude --plugin-dir C:\Projects\AgentGate\agentgate-plugin
+claude --dangerously-load-development-channels server:agentgate
 ```

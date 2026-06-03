@@ -80,7 +80,7 @@ Claude A 用户说:
 |------|-----|
 | 操作系统 | Windows 11 |
 | Claude 版本 | deepseek-v4-pro (claude.exe, 234MB Bun 编译) |
-| 启动方式 | `claude --plugin-dir agentgate-plugin` |
+| 启动方式 | `claude --dangerously-load-development-channels server:agentgate` |
 | Agent ID 传递 | 文件 `~/.agentgate/agent_id`（env 变量不传递到 MCP 子进程） |
 | Bridge 端口 | 8444（自动组网: 先启动者为 hub, 后启动者为 peer） |
 | MCP SDK | `@modelcontextprotocol/sdk@^1.29.0` |
@@ -109,14 +109,14 @@ Claude A 用户说:
 ```powershell
 # 终端 A
 echo agent-alpha > $env:USERPROFILE\.agentgate\agent_id
-claude --plugin-dir C:\Projects\AgentGate\agentgate-plugin
+claude --dangerously-load-development-channels server:agentgate
 
 # 在 Claude A 中:
 # "用 send_message 工具给 agent-beta 发消息，内容写"你好""
 
 # 终端 B
 echo agent-beta > $env:USERPROFILE\.agentgate\agent_id
-claude --plugin-dir C:\Projects\AgentGate\agentgate-plugin
+claude --dangerously-load-development-channels server:agentgate
 
 # 在 Claude B 中:
 # "列出最近的对话" → 会看到新对话
@@ -392,13 +392,13 @@ JavaScript 源码被编译为 Bun 内部格式，无法使用 wakaru（JS/TS 解
 cd C:\Projects\AgentGate && npm run build
 
 # 同步插件
-Copy-Item -Recurse -Force dist/* agentgate-plugin/dist/
+npm run build
 
 # 设置 agent_id
 echo agent-alpha > $env:USERPROFILE\.agentgate\agent_id
 
 # 启动 Claude
-claude --plugin-dir C:\Projects\AgentGate\agentgate-plugin
+claude --dangerously-load-development-channels server:agentgate
 
 # 单独测试 MCP server
 node dist/mcp_server.js

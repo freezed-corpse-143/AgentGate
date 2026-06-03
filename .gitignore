@@ -2,3 +2,18 @@ node_modules/
 dist/
 *.tmp
 .agentgate/
+
+# Editor / IDE / tooling
+.claude/
+.codebase-memory/
+.codegraph/
+.reasonix/
+
+# Plugin wrapper (flattened to root)
+agentgate-plugin/
+
+# Dev / generated
+browser/
+output/
+plugins/
+reasonix.toml

@@ -22,7 +22,7 @@ AgentGate 是一个 **Claude Code MCP 插件**，利用 `notifications/claude/ch
     "agentgate": {
       "command": "node",
       "args": [
-        "C:\\Projects\\AgentGate\\agentgate-plugin\\dist\\mcp_server.js",
+        "C:\\Projects\\AgentGate\\dist\\mcp_server.js",
         "--agent-id",
         "${AGENTGATE_DEFAULT_AGENT}"
       ]
@@ -37,8 +37,7 @@ AgentGate 是一个 **Claude Code MCP 插件**，利用 `notifications/claude/ch
 ### 构建
 
 ```bash
-node_modules\.bin\tsc.cmd
-xcopy /E /I /Y dist agentgate-plugin\dist
+npm run build
 ```
 
 ### 启动（单实例）
@@ -174,10 +173,9 @@ src/
     conversation_store.ts    — 消息持久化
     conversation_sync.ts     — 跨进程同步
 
-agentgate-plugin/
-  .mcp.json                  — MCP server 注册
-  .claude-plugin/            — 插件 manifest
-  dist/                      — 编译产物（src/ 的副本）
+.mcp.json                  — MCP server 注册
+.claude-plugin/            — 插件 manifest
+skills/                    — Skill 插件
 
 docs/
   BRIDGE_PROTOCOL.md         — Bridge v2 协议文档
@@ -209,8 +207,7 @@ tests/
 
 ```bash
 # 构建
-node_modules\.bin\tsc.cmd
-xcopy /E /I /Y dist agentgate-plugin\dist
+npm run build
 
 # 测试
 npx vitest run tests/unit        # 85 单元测试

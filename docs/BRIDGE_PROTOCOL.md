@@ -12,7 +12,7 @@
 - Node.js 24+
 - `~/.claude.json` 已配置 `mcpServers.agentgate`（见下方）
 - 项目已构建：`node_modules\.bin\tsc.cmd`
-- 插件已同步：`xcopy /E /I /Y dist agentgate-plugin\dist`
+- 项目已构建：`npm run build`
 
 ### 配置 `~/.claude.json`
 
@@ -22,7 +22,7 @@
     "agentgate": {
       "command": "node",
       "args": [
-        "C:\\Projects\\AgentGate\\agentgate-plugin\\dist\\mcp_server.js",
+        "C:\\Projects\\AgentGate\\dist\\mcp_server.js",
         "--agent-id",
         "${AGENTGATE_DEFAULT_AGENT}"
       ]
@@ -304,7 +304,7 @@ claude --dangerously-load-development-channels server:agentgate
     "agentgate": {
       "command": "node",
       "args": [
-        "C:\\Projects\\AgentGate\\agentgate-plugin\\dist\\mcp_server.js",
+        "C:\\Projects\\AgentGate\\dist\\mcp_server.js",
         "--agent-id", "${AGENTGATE_DEFAULT_AGENT}"
       ]
     }

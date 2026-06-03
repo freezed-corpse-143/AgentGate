@@ -6,7 +6,7 @@
   "main": "dist/index.js",
   "bin": "dist/index.js",
   "scripts": {
-    "build": "tsc && node -e \"const f=require('fs');const d='agentgate-plugin/dist';if(!f.existsSync(d)||f.readdirSync(d).length===0){f.cpSync('dist',d,{recursive:true});console.log('[build] Plugin dist synced')}\"",
+    "build": "tsc",
     "dev": "tsc --watch",
     "start": "node dist/index.js",
     "clean": "rm -rf dist",
