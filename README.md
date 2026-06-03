@@ -14,7 +14,26 @@ AgentGate 是一个 **Claude Code MCP 插件**，利用 `notifications/claude/ch
 - Claude Code v2.1.150+
 - `~/.claude.json` 已配置（见下方）
 
+### 安装
+
+#### 方式 A：从 GitHub Clone（推荐）
+
+```bash
+git clone https://github.com/freezed-corpse-143/AgentGate.git
+cd AgentGate
+npm install
+npm run build
+```
+
+#### 方式 B：使用 Claude Plugin Directory（开发模式）
+
+```bash
+claude --plugin-dir /path/to/AgentGate --dangerously-load-development-channels server:agentgate
+```
+
 ### 配置 `~/.claude.json`
+
+将 `<AGENTGATE_DIR>` 替换为你的实际路径（如 `/home/user/AgentGate` 或 `C:\Users\name\AgentGate`）：
 
 ```json
 {
@@ -22,7 +41,7 @@ AgentGate 是一个 **Claude Code MCP 插件**，利用 `notifications/claude/ch
     "agentgate": {
       "command": "node",
       "args": [
-        "C:\\Projects\\AgentGate\\dist\\mcp_server.js",
+        "<AGENTGATE_DIR>/dist/mcp_server.js",
         "--agent-id",
         "${AGENTGATE_DEFAULT_AGENT}"
       ]
