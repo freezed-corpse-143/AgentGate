@@ -21,10 +21,10 @@ echo "[AgentGate] 注册 MCP Server 到 Claude Code (user scope)..."
 echo "   Server: $MCP_SERVER"
 echo "   Agent ID: $AGENT_ID"
 
-claude mcp add agentscope --scope user -- \
+claude mcp add agentgate --scope user -- \
   node "$MCP_SERVER" \
   --agent-id "$AGENT_ID"
 
 echo ""
-echo "[AgentGate] ✅ 完成！已在 ~/.claude.json 中添加 agentscope 服务。"
+echo "[AgentGate] ✅ 完成！已在 ~/.claude.json 中添加 agentgate 服务。"
 echo "   启动 Claude Code 后即可通过 MCP 工具与 AgentGate 交互。"

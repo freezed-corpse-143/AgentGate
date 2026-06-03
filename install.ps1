@@ -27,10 +27,10 @@ Write-Host "   Server: $McpServer"
 Write-Host "   Agent ID: $AgentId"
 
 # Windows 路径需要反斜杠转义？不需要 — claude CLI 自己处理
-claude mcp add agentscope --scope user -- `
+claude mcp add agentgate --scope user -- `
   node "$McpServer" `
   --agent-id "$AgentId"
 
 Write-Host ""
-Write-Host "[AgentGate] ✅ 完成！已在 ~/.claude.json 中添加 agentscope 服务。" -ForegroundColor Green
+Write-Host "[AgentGate] ✅ 完成！已在 ~/.claude.json 中添加 agentgate 服务。" -ForegroundColor Green
 Write-Host "   启动 Claude Code 后即可通过 MCP 工具与 AgentGate 交互。"
