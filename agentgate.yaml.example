@@ -1,0 +1,34 @@
+# AgentGate 配置文件示例
+# 放置路径: ~/.agentgate/config.yaml 或当前目录 agentgate.yaml
+# 环境变量优先级高于配置文件
+
+server:
+  defaultAgent: default
+
+channels:
+  # REST API 信道
+  rest:
+    enabled: true
+    port: 3000
+    host: 0.0.0.0
+
+  # Telegram Bot 信道 (可选)
+  telegram:
+    enabled: false
+    token: ""                 # 也可通过 TELEGRAM_BOT_TOKEN 设置
+    apiRoot: ""               # 自定义 API 根 (测试用)
+
+# 预注册 Agent
+agents:
+  - id: default
+    name: Default Agent
+    description: Built-in default agent
+    capabilities: [chat, echo]
+
+  - id: reviewer
+    name: Code Reviewer
+    description: Reviews code changes
+    capabilities: [chat, review]
+
+logging:
+  level: info                 # debug | info | warn | error

@@ -1,0 +1,6 @@
+@echo off
+set AGENTGATE_DEFAULT_AGENT=%1
+set AGENTGATE_BRIDGE_ENABLED=true
+set AGENTGATE_BRIDGE_PORT=8444
+set AGENTGATE_BRIDGE_HOST=localhost
+node dist/mcp_server.js

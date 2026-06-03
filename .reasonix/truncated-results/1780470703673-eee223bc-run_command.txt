@@ -1,0 +1,404 @@
+$ npx vitest run --no-color 2>&1
+[exit 1]
+[31;1mSetValueInvocationException: [0m
+[31;1m[36;1mLine |[0m
+[31;1m[36;1m[36;1m   3 | [0m [36;1m$RawUI.CursorPosition = @{X=0;Y=0}[0m
+[31;1m[36;1m[36;1m[0m[36;1m[0m[36;1m     | [31;1m ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[31;1m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m     | [31;1mException setting "CursorPosition": "句柄无效。"[0m
+[31;1mSet-PSReadLineOption: [0mC:\Users\y86133\Documents\PowerShell\Microsoft.PowerShell_profile.ps1:272[0m
+[31;1m[0m[36;1mLine |[0m
+[31;1m[0m[36;1m[36;1m 272 | [0m     [36;1mSet-PSReadLineOption -PredictionSource HistoryAndPlugin[0m
+[31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m     | [31;1m     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m     | [31;1mThe predictive suggestion feature cannot be enabled because the console output doesn't support virtual terminal[0m
+[31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m[31;1m[36;1m     | [31;1mprocessing or it's redirected.[0m
+[31;1mSet-PSReadLineOption: [0mC:\Users\y86133\Documents\PowerShell\Microsoft.PowerShell_profile.ps1:273[0m
+[31;1m[0m[36;1mLine |[0m
+[31;1m[0m[36;1m[36;1m 273 | [0m     [36;1mSet-PSReadLineOption -PredictionViewStyle ListView[0m
+[31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m     | [31;1m     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m     | [31;1m句柄无效。[0m
+Loading personal and system profiles took 729ms.
+
+ RUN  v4.1.8 C:/Projects/AgentGate
+
+stderr | tests/unit/ssh_tunnel.test.ts > SshTunnelManager — 配置解析 > 应解析 user@host:port 格式
+[SshTunnel] Connected to ubuntu@jumphost.example.com:2222
+[SshTunnel] Remote forward active: 0.0.0.0:18445 → localhost:18445
+
+stdout | tests/unit/registry.test.ts > AgentRegistry > 应注册和查找 Agent
+[AgentRegistry] Registered: agent-alpha (Alpha Agent)
+
+stdout | tests/unit/registry.test.ts > AgentRegistry > 应注销 Agent
+[AgentRegistry] Registered: agent-alpha (Alpha Agent)
+[AgentRegistry] Unregistered: agent-alpha
+
+stdout | tests/unit/registry.test.ts > AgentRegistry > 应按能力筛选 Agent
+[AgentRegistry] Registered: agent-alpha (Alpha Agent)
+[AgentRegistry] Registered: agent-beta (Beta Agent)
+
+stdout | tests/unit/registry.test.ts > AgentRegistry > 应列出所有 Agent
+[AgentRegistry] Registered: agent-alpha (Alpha Agent)
+[AgentRegistry] Registered: agent-beta (Beta Agent)
+
+stdout | tests/unit/registry.test.ts > AgentRegistry > 应更新 Agent 状态
+[AgentRegistry] Registered: agent-alpha (Alpha Agent)
+
+stdout | tests/unit/registry.test.ts > AgentRegistry > clear 应清空所有 Agent
+[AgentRegistry] Registered: agent-alpha (Alpha Agent)
+[AgentRegistry] Registered: agent-beta (Beta Agent)
+
+ ✓ tests/unit/registry.test.ts (9 tests) 17ms
+ ✓ tests/unit/envelope.test.ts (23 tests) 21ms
+stderr | tests/unit/ssh_tunnel.test.ts > SshTunnelManager — 配置解析 > 应解析 user@host:port 格式
+[SshTunnel] Disconnected (wasError=false)
+
+stderr | tests/unit/ssh_tunnel.test.ts > SshTunnelManager — 配置解析 > 应解析 host:port 格式（无用户名）
+[SshTunnel] Connected to jumphost.example.com:18445
+[SshTunnel] Remote forward active: 0.0.0.0:18445 → localhost:18445
+
+ ✓ tests/unit/binding_store.test.ts (8 tests) 29ms
+stdout | tests/unit/conversation_sync.test.ts > ConversationSync > 本地 append 应发布到 _system.conversation.sync
+[ConversationSync] Started — listening on _system.conversation.sync
+
+stdout | tests/unit/conversation_sync.test.ts > ConversationSync > bus 收到 _system.conversation.sync 应追加到 store
+[ConversationSync] Started — listening on _system.conversation.sync
+
+ ❯ tests/integration/conversation_sync.test.ts (4 tests | 4 failed) 15ms
+     × Store A 追加消息应同步到 Store B 8ms
+     × 双向同步: Store B 追加也应同步到 Store A 1ms
+     × 不应出现无限同步回路 1ms
+     × 多条消息应全部同步 1ms
+stderr | tests/integration/ssh_mesh.test.ts > SSH Mesh 集成 — BridgeAgent + SshTunnelManager > 启用 SSH 但不设 jumphost 时创建空 SshTunnelManager（不连接）
+[Bridge] SSH enabled but no jumphost set (AGENTGATE_SSH_JUMPHOST)
+
+stderr | tests/integration/ssh_mesh.test.ts > SSH Mesh 集成 — BridgeAgent + SshTunnelManager > BridgeAgent.start() 应启动 SSH 隧道
+[Bridge] Listening on 127.0.0.1:64201
+
+ ✓ tests/unit/session_registry.test.ts (7 tests) 17ms
+ ✓ tests/unit/handshake.test.ts (10 tests) 15ms
+stderr | tests/unit/ssh_tunnel.test.ts > SshTunnelManager — 配置解析 > 应解析 host:port 格式（无用户名）
+[SshTunnel] Disconnected (wasError=false)
+
+stderr | tests/integration/ssh_mesh.test.ts > SSH Mesh 集成 — BridgeAgent + SshTunnelManager > BridgeAgent.start() 应启动 SSH 隧道
+[SshTunnel] Connected to user@jumphost:22
+[SshTunnel] Remote forward active: 0.0.0.0:64201 → localhost:64201
+
+stderr | tests/unit/ssh_tunnel.test.ts > SshTunnelManager — 配置解析 > 应解析 user@host 格式（默认端口 22）
+[SshTunnel] Connected to admin@server
+[SshTunnel] Remote forward active: 0.0.0.0:18445 → localhost:18445
+
+stderr | tests/integration/ssh_mesh.test.ts > SSH Mesh 集成 — BridgeAgent + SshTunnelManager > BridgeAgent.start() 应启动 SSH 隧道
+[Bridge] Connected to registry at 127.0.0.1:8444
+
+ ✓ tests/unit/channel_gateway.test.ts (6 tests) 15ms
+stdout | tests/integration/ssh_adapter.test.ts > SSH Adapter
+[SSH] Listening on 127.0.0.1:64207
+
+stdout | tests/unit/runtime.test.ts > AgentRuntime — 跨 Agent 路由 > 字符串回复应发布到 outbound topic
+[AgentRegistry] Registered: agent-alpha (Alpha)
+[AgentRegistry] Registered: agent-beta (Beta)
+
+stdout | tests/unit/runtime.test.ts > AgentRuntime — 跨 Agent 路由 > 字符串回复应发布到 outbound topic
+[AgentRuntime] Started — listening on agent.*.inbound (agents: [agent-alpha])
+
+stdout | tests/unit/runtime.test.ts > AgentRuntime — 跨 Agent 路由 > 带 target_agent_id 的回复应路由到目标 Agent 的 inbound
+[AgentRegistry] Registered: agent-alpha (Alpha)
+[AgentRegistry] Registered: agent-beta (Beta)
+
+stdout | tests/unit/runtime.test.ts > AgentRuntime — 跨 Agent 路由 > 带 target_agent_id 的回复应路由到目标 Agent 的 inbound
+[AgentRuntime] Started — listening on agent.*.inbound (agents: [agent-alpha])
+
+stderr | tests/unit/ssh_tunnel.test.ts > SshTunnelManager — 配置解析 > 应解析 user@host 格式（默认端口 22）
+[SshTunnel] Disconnected (wasError=false)
+
+stdout | tests/unit/runtime.test.ts > AgentRuntime — 跨 Agent 路由 > 带 target_agent_id 的回复应路由到目标 Agent 的 inbound
+[AgentRuntime] Routing msg_in_1 → agent-beta (hop 1)
+
+stderr | tests/unit/ssh_tunnel.test.ts > SshTunnelManager — 配置解析 > 应解析 host 格式（仅主机名）
+[SshTunnel] Connected to jumphost
+[SshTunnel] Remote forward active: 0.0.0.0:18445 → localhost:18445
+
+stdout | tests/unit/runtime.test.ts > AgentRuntime — 跨 Agent 路由 > 跨 Agent 消息不应发布到 outbound topic
+[AgentRegistry] Registered: agent-alpha (Alpha)
+[AgentRegistry] Registered: agent-beta (Beta)
+
+stdout | tests/unit/runtime.test.ts > AgentRuntime — 跨 Agent 路由 > 跨 Agent 消息不应发布到 outbound topic
+[AgentRuntime] Started — listening on agent.*.inbound (agents: [agent-alpha])
+
+stdout | tests/unit/runtime.test.ts > AgentRuntime — 跨 Agent 路由 > 跨 Agent 消息不应发布到 outbound topic
+[AgentRuntime] Routing msg_in_1 → agent-beta (hop 1)
+
+stderr | tests/integration/ssh_mesh.test.ts > SSH Mesh 集成 — BridgeAgent + SshTunnelManager > BridgeAgent.start() 应启动 SSH 隧道
+[SshTunnel] Disconnected (wasError=false)
+
+stderr | tests/unit/ssh_tunnel.test.ts > SshTunnelManager — 配置解析 > 应解析 host 格式（仅主机名）
+[SshTunnel] Disconnected (wasError=false)
+
+stdout | tests/unit/runtime.test.ts > AgentRuntime — 跨 Agent 路由 > 循环检测应丢弃超跳消息
+[AgentRegistry] Registered: agent-alpha (Alpha)
+[AgentRegistry] Registered: agent-beta (Beta)
+
+stderr | tests/unit/ssh_tunnel.test.ts > SshTunnelManager — 配置解析 > username 参数应覆盖 jumphost 中的用户名
+[SshTunnel] Connected to nobody@jumphost:2222
+[SshTunnel] Remote forward active: 0.0.0.0:18445 → localhost:18445
+
+stderr | tests/unit/runtime.test.ts > AgentRuntime — 跨 Agent 路由 > 循环检测应丢弃超跳消息
+[AgentRuntime] Route loop detected for msg_in_1, dropping
+
+stdout | tests/unit/runtime.test.ts > AgentRuntime — 跨 Agent 路由 > 循环检测应丢弃超跳消息
+[AgentRuntime] Started — listening on agent.*.inbound (agents: [agent-alpha])
+
+stdout | tests/unit/runtime.test.ts > AgentRuntime — 跨 Agent 路由 > 已处理检测应丢弃重复消息
+[AgentRegistry] Registered: agent-alpha (Alpha)
+[AgentRegistry] Registered: agent-beta (Beta)
+
+stdout | tests/unit/runtime.test.ts > AgentRuntime — 跨 Agent 路由 > 已处理检测应丢弃重复消息
+[AgentRuntime] Started — listening on agent.*.inbound (agents: [agent-alpha])
+
+stderr | tests/unit/runtime.test.ts > AgentRuntime — 跨 Agent 路由 > 已处理检测应丢弃重复消息
+[AgentRuntime] agent-alpha already processed msg_in_1, dropping
+
+stdout | tests/unit/conversation_sync.test.ts > ConversationSync > 回路避免: 远端同步不应再次广播
+[ConversationSync] Started — listening on _system.conversation.sync
+
+stderr | tests/integration/ssh_mesh.test.ts > SSH Mesh 集成 — BridgeAgent + SshTunnelManager > BridgeAgent.stop() 应停止 SSH 隧道
+[Bridge] Listening on 127.0.0.1:64211
+
+stderr | tests/integration/ssh_mesh.test.ts > SSH Mesh 集成 — BridgeAgent + SshTunnelManager > BridgeAgent.stop() 应停止 SSH 隧道
+[SshTunnel] Connected to user@jumphost:22
+[SshTunnel] Remote forward active: 0.0.0.0:64211 → localhost:64211
+
+stderr | tests/integration/ssh_mesh.test.ts > SSH Mesh 集成 — BridgeAgent + SshTunnelManager > BridgeAgent.stop() 应停止 SSH 隧道
+[Bridge] Connected to registry at 127.0.0.1:8444
+
+stderr | tests/unit/ssh_tunnel.test.ts > SshTunnelManager — 配置解析 > username 参数应覆盖 jumphost 中的用户名
+[SshTunnel] Disconnected (wasError=false)
+
+stderr | tests/unit/ssh_tunnel.test.ts > SshTunnelManager — 配置解析 > port 参数应覆盖 jumphost 中的端口
+[SshTunnel] Connected to user@jumphost:2222
+[SshTunnel] Remote forward active: 0.0.0.0:18445 → localhost:18445
+
+ ✓ tests/unit/memory_bus.test.ts (8 tests) 7ms
+stderr | tests/unit/ssh_tunnel.test.ts > SshTunnelManager — 配置解析 > port 参数应覆盖 jumphost 中的端口
+[SshTunnel] Disconnected (wasError=false)
+
+stdout | tests/unit/runtime.test.ts > AgentRuntime — 跨 Agent 路由 > 多跳路由应正常传递
+[AgentRegistry] Registered: agent-alpha (Alpha)
+[AgentRegistry] Registered: agent-beta (Beta)
+
+stdout | tests/unit/runtime.test.ts > AgentRuntime — 跨 Agent 路由 > 多跳路由应正常传递
+[AgentRegistry] Registered: agent-gamma (Gamma)
+[AgentRuntime] Started — listening on agent.*.inbound (agents: [agent-alpha, agent-beta])
+
+stderr | tests/unit/ssh_tunnel.test.ts > SshTunnelManager — 生命周期 > enabled 时应建立 SSH 连接
+[SshTunnel] Connected to user@host:22
+[SshTunnel] Remote forward active: 0.0.0.0:18445 → localhost:18445
+
+stdout | tests/unit/router.test.ts > SessionRouter > 有绑定且 Agent 已注册时应完整路由
+[AgentRegistry] Registered: agent-alpha (Alpha)
+
+stdout | tests/unit/runtime.test.ts > AgentRuntime — 跨 Agent 路由 > 多跳路由应正常传递
+[AgentRuntime] Routing msg_in_1 → agent-beta (hop 1)
+
+stdout | tests/unit/runtime.test.ts > AgentRuntime — 跨 Agent 路由 > 多跳路由应正常传递
+[AgentRuntime] Routing msg_mpxq9zm3808ca97637eb → agent-gamma (hop 2)
+
+ ✓ tests/unit/router.test.ts (4 tests) 7ms
+ ✓ tests/unit/runtime.test.ts (6 tests) 192ms
+stderr | tests/integration/ssh_mesh.test.ts > SSH Mesh 集成 — BridgeAgent + SshTunnelManager > BridgeAgent.stop() 应停止 SSH 隧道
+[SshTunnel] Disconnected (wasError=false)
+
+stderr | tests/unit/ssh_tunnel.test.ts > SshTunnelManager — 生命周期 > enabled 时应建立 SSH 连接
+[SshTunnel] Disconnected (wasError=false)
+
+stderr | tests/unit/ssh_tunnel.test.ts > SshTunnelManager — 生命周期 > 停止后应断开 SSH 连接
+[SshTunnel] Connected to user@host
+[SshTunnel] Remote forward active: 0.0.0.0:18445 → localhost:18445
+
+stderr | tests/integration/ssh_mesh.test.ts > SSH Mesh 集成 — BridgeAgent + SshTunnelManager > SSH 端口应自动从 actualPort 获取
+[Bridge] Listening on 127.0.0.1:64219
+
+stderr | tests/integration/ssh_mesh.test.ts > SSH Mesh 集成 — BridgeAgent + SshTunnelManager > SSH 端口应自动从 actualPort 获取
+[SshTunnel] Connected to user@jumphost:22
+[SshTunnel] Remote forward active: 0.0.0.0:64219 → localhost:64219
+
+stderr | tests/integration/ssh_mesh.test.ts > SSH Mesh 集成 — BridgeAgent + SshTunnelManager > SSH 端口应自动从 actualPort 获取
+[Bridge] Connected to registry at 127.0.0.1:8444
+
+stderr | tests/unit/ssh_tunnel.test.ts > SshTunnelManager — 生命周期 > 停止后应断开 SSH 连接
+[SshTunnel] Disconnected (wasError=false)
+
+stderr | tests/unit/ssh_tunnel.test.ts > SshTunnelManager — 生命周期 > start 时应建立 Remote Port Forwarding
+[SshTunnel] Connected to user@host
+[SshTunnel] Remote forward active: 0.0.0.0:18446 → localhost:18445
+
+stderr | tests/unit/ssh_tunnel.test.ts > SshTunnelManager — 生命周期 > start 时应建立 Remote Port Forwarding
+[SshTunnel] Disconnected (wasError=false)
+
+stderr | tests/unit/ssh_tunnel.test.ts > SshTunnelManager — 生命周期 > remoteBindAddr 应传递给 forwardIn
+[SshTunnel] Connected to user@host
+[SshTunnel] Remote forward active: 127.0.0.1:18446 → localhost:18445
+
+stderr | tests/integration/ssh_mesh.test.ts > SSH Mesh 集成 — BridgeAgent + SshTunnelManager > SSH 端口应自动从 actualPort 获取
+[SshTunnel] Disconnected (wasError=false)
+
+stderr | tests/unit/ssh_tunnel.test.ts > SshTunnelManager — 生命周期 > remoteBindAddr 应传递给 forwardIn
+[SshTunnel] Disconnected (wasError=false)
+
+stderr | tests/unit/ssh_tunnel.test.ts > SshTunnelManager — 断线重连 > close 事件后应重新连接
+[SshTunnel] Connected to user@host
+[SshTunnel] Remote forward active: 0.0.0.0:18445 → localhost:18445
+
+stdout | tests/unit/conversation_sync.test.ts > ConversationSync > stop() 应停止同步
+[ConversationSync] Started — listening on _system.conversation.sync
+
+stderr | tests/integration/ssh_mesh.test.ts > SSH Mesh 集成 — BridgeAgent + SshTunnelManager > sshRemotePort 应覆盖 remotePort
+[Bridge] Listening on 127.0.0.1:18445
+
+stderr | tests/integration/ssh_mesh.test.ts > SSH Mesh 集成 — BridgeAgent + SshTunnelManager > sshRemotePort 应覆盖 remotePort
+[SshTunnel] Connected to user@jumphost:22
+[SshTunnel] Remote forward active: 0.0.0.0:28445 → localhost:18445
+
+stderr | tests/integration/ssh_mesh.test.ts > SSH Mesh 集成 — BridgeAgent + SshTunnelManager > sshRemotePort 应覆盖 remotePort
+[Bridge] Connected to registry at 127.0.0.1:8444
+
+ ❯ tests/integration/telegram_pipeline.test.ts (3 tests | 3 skipped) 660ms
+     ↓ Mock API 应响应 getMe
+     ↓ 注入消息后 Mock API 应通过 getUpdates 返回
+     ↓ AgentGate 应该健康运行
+stderr | tests/unit/ssh_tunnel.test.ts > SshTunnelManager — 断线重连 > close 事件后应重新连接
+[SshTunnel] Disconnected (wasError=false)
+[SshTunnel] Reconnecting in 1000ms (attempt 1)
+
+stderr | tests/integration/ssh_mesh.test.ts > SSH Mesh 集成 — BridgeAgent + SshTunnelManager > sshRemotePort 应覆盖 remotePort
+[SshTunnel] Disconnected (wasError=false)
+
+ ✓ tests/integration/ssh_mesh.test.ts (9 tests) 721ms
+ ✓ tests/unit/conversation_sync.test.ts (4 tests) 752ms
+     ✓ 回路避免: 远端同步不应再次广播  314ms
+ ✓ tests/integration/ssh_adapter.test.ts (3 tests) 1088ms
+     ✓ Exec 模式: 发送命令应触发 RawMessage  518ms
+     ✓ 多条 exec 命令应依次触发 RawMessage  515ms
+ ✓ tests/integration/rest_pipeline.test.ts (4 tests) 1670ms
+     ✓ 应接收消息并产生回复  530ms
+     ✓ 对话消息应包含 user 和 agent 两条记录  534ms
+stderr | tests/unit/ssh_tunnel.test.ts > SshTunnelManager — 断线重连 > close 事件后应重新连接
+[SshTunnel] Connected to user@host
+[SshTunnel] Remote forward active: 0.0.0.0:18445 → localhost:18445
+
+stderr | tests/unit/ssh_tunnel.test.ts > SshTunnelManager — 断线重连 > close 事件后应重新连接
+[SshTunnel] Disconnected (wasError=false)
+
+stderr | tests/unit/ssh_tunnel.test.ts > SshTunnelManager — 本地端口转发 (ssh -L) > 应建立 Local Port Forwarding
+[SshTunnel] Connected to user@host
+[SshTunnel] Remote forward active: 0.0.0.0:18445 → localhost:18445
+[SshTunnel] Local forward active: :16379 → internal.redis:6379
+
+stderr | tests/unit/ssh_tunnel.test.ts > SshTunnelManager — 本地端口转发 (ssh -L) > 应建立 Local Port Forwarding
+[SshTunnel] Disconnected (wasError=false)
+
+stderr | tests/unit/ssh_tunnel.test.ts > SshTunnelManager — 事件回调 > onConnected 回调应在连接成功后触发
+[SshTunnel] Connected to user@host
+[SshTunnel] Remote forward active: 0.0.0.0:18445 → localhost:18445
+
+stderr | tests/unit/ssh_tunnel.test.ts > SshTunnelManager — 事件回调 > onConnected 回调应在连接成功后触发
+[SshTunnel] Disconnected (wasError=false)
+
+stderr | tests/unit/ssh_tunnel.test.ts > SshTunnelManager — 事件回调 > onDisconnected 回调应在断开后触发
+[SshTunnel] Connected to user@host
+[SshTunnel] Remote forward active: 0.0.0.0:18445 → localhost:18445
+
+stderr | tests/unit/ssh_tunnel.test.ts > SshTunnelManager — 事件回调 > onDisconnected 回调应在断开后触发
+[SshTunnel] Disconnected (wasError=false)
+
+stderr | tests/unit/ssh_tunnel.test.ts > SshTunnelManager — 事件回调 > error 事件应触发 onError 回调
+[SshTunnel] Connected to user@host
+[SshTunnel] Remote forward active: 0.0.0.0:18445 → localhost:18445
+
+stderr | tests/unit/ssh_tunnel.test.ts > SshTunnelManager — 事件回调 > error 事件应触发 onError 回调
+[SshTunnel] Error: Connection refused
+[SshTunnel] Disconnected (wasError=true)
+
+stderr | tests/unit/ssh_tunnel.test.ts > SshTunnelManager — 环境变量配置 > AGENTGATE_SSH_ENABLED 和 AGENTGATE_SSH_JUMPHOST 应生效
+[SshTunnel] Connected to env-user@env-host:2222
+[SshTunnel] Remote forward active: 0.0.0.0:18445 → localhost:18445
+
+stderr | tests/unit/ssh_tunnel.test.ts > SshTunnelManager — 环境变量配置 > AGENTGATE_SSH_ENABLED 和 AGENTGATE_SSH_JUMPHOST 应生效
+[SshTunnel] Disconnected (wasError=false)
+
+ ✓ tests/unit/ssh_tunnel.test.ts (17 tests) 2539ms
+     ✓ close 事件后应重新连接  1580ms
+ ❯ tests/e2e/telegram_adapter.test.ts (4 tests | 4 skipped) 15741ms
+     ↓ Mock API 应响应 getMe
+     ↓ 注入消息后 Mock API 应通过 getUpdates 返回
+     ↓ TelegramAdapter 轮询到消息后 Agent 应回复
+     ↓ 发送多条消息应依次回复
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/e2e/telegram_adapter.test.ts > Telegram 全链路
+Error: Port 64194 not ready in 15000ms
+ ❯ waitForPort tests/e2e/telegram_adapter.test.ts:44:9
+     42|     await sleep(300)
+     43|   }
+     44|   throw new Error(`Port ${port} not ready in ${timeoutMs}ms`)
+       |         ^
+     45| }
+     46|
+ ❯ tests/e2e/telegram_adapter.test.ts:101:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/10]⎯
+
+ FAIL  tests/integration/telegram_pipeline.test.ts > Telegram Pipeline (integration)
+Error: Mock API exited early (code=2): C:\Users\y86133\AppData\Local\Python\pythoncore-3.14-64\python.exe: can't open file 'C:\\Projects\\AgentGate\\tests\\mock_telegram_api.py': [Errno 2] No such file or directory
+
+ ❯ startMockApi tests/integration/helpers.ts:51:13
+     49|       const out = Buffer.concat(stdout).toString()
+     50|       const err = Buffer.concat(stderr).toString()
+     51|       throw new Error(`Mock API exited early (code=${proc.exitCode}): …
+       |             ^
+     52|     }
+     53|   }
+ ❯ tests/integration/telegram_pipeline.test.ts:26:23
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/10]⎯
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/integration/conversation_sync.test.ts > ConversationStore 跨进程同步 > Store A 追加消息应同步到 Store B
+ FAIL  tests/integration/conversation_sync.test.ts > ConversationStore 跨进程同步 > 双向同步: Store B 追加也应同步到 Store A
+ FAIL  tests/integration/conversation_sync.test.ts > ConversationStore 跨进程同步 > 不应出现无限同步回路
+ FAIL  tests/integration/conversation_sync.test.ts > ConversationStore 跨进程同步 > 多条消息应全部同步
+ReferenceError: BridgeServer is not defined
+ ❯ startBridge tests/integration/conversation_sync.test.ts:20:18
+     18|
+     19| async function startBridge(): Promise<{ server: BridgeServer; port: nu…
+     20|   const server = new BridgeServer({ port: 0, host: '127.0.0.1' })
+       |                  ^
+     21|   await server.start()
+     22|   const addr = (server as any).server?.address()
+ ❯ tests/integration/conversation_sync.test.ts:74:21
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/10]⎯
+
+ FAIL  tests/integration/conversation_sync.test.ts > ConversationStore 跨进程同步 > Store A 追加消息应同步到 Store B
+ FAIL  tests/integration/conversation_sync.test.ts > ConversationStore 跨进程同步 > 双向同步: Store B 追加也应同步到 Store A
+ FAIL  tests/integration/conversation_sync.test.ts > ConversationStore 跨进程同步 > 不应出现无限同步回路
+ FAIL  tests/integration/conversation_sync.test.ts > ConversationStore 跨进程同步 > 多条消息应全部同步
+TypeError: Cannot read properties of undefined (reading 'client')
+ ❯ tests/integration/conversation_sync.test.ts:83:11
+     81|
+     82|   afterEach(async () => {
+     83|     procA.client.disconnect()
+       |           ^
+     84|     procB.client.disconnect()
+     85|     await new Promise(r => setTimeout(r, 300))
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/10]⎯
+
+
+ Test Files  3 failed | 14 passed (17)
+      Tests  4 failed | 118 passed | 7 skipped (129)
+   Start at  15:11:27
+   Duration  16.24s (transform 2.06s, setup 0ms, import 4.00s, tests 23.50s, environment 3ms)
+

@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgentGate Dashboard</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0d1117; color: #c9d1d9; padding: 20px; }
+  h1 { font-size: 1.4em; margin-bottom: 16px; color: #58a6ff; }
+  h2 { font-size: 1.1em; margin: 12px 0 8px; color: #8b949e; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; max-width: 1200px; }
+  .card { background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 16px; }
+  .stat { display: inline-block; margin-right: 24px; }
+  .stat-value { font-size: 1.8em; font-weight: 600; color: #f0f6fc; }
+  .stat-label { font-size: 0.8em; color: #8b949e; text-transform: uppercase; }
+  #events { height: 300px; overflow-y: auto; font-family: 'SF Mono', Monaco, monospace; font-size: 0.8em; background: #0d1117; border: 1px solid #30363d; border-radius: 4px; padding: 8px; }
+  .event { padding: 2px 0; border-bottom: 1px solid #21262d; }
+  .event-user { color: #58a6ff; }
+  .event-agent { color: #3fb950; }
+  .event-system { color: #d29922; }
+  .event-router { color: #f0883e; }
+  .event-error { color: #f85149; }
+  .timestamp { color: #484f58; margin-right: 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #21262d; }
+  th { color: #8b949e; font-weight: 500; }
+  .status-idle { color: #8b949e; }
+  .status-busy { color: #d29922; }
+  .status-error { color: #f85149; }
+</style>
+</head>
+<body>
+<h1>AgentGate Dashboard</h1>
+
+<div class="grid">
+  <div class="card">
+    <h2>Status</h2>
+    <div class="stat"><div class="stat-value" id="uptime">-</div><div class="stat-label">Uptime</div></div>
+    <div class="stat"><div class="stat-value" id="msgCount">0</div><div class="stat-label">Messages</div></div>
+    <div class="stat"><div class="stat-value" id="agentCount">0</div><div class="stat-label">Agents</div></div>
+  </div>
+  <div class="card">
+    <h2>Agents</h2>
+    <table id="agentTable"><tr><th>ID</th><th>Name</th><th>Status</th></tr></table>
+  </div>
+</div>
+
+<div class="card" style="margin-top:16px;max-width:1200px">
+  <h2>Live Events</h2>
+  <div id="events">Connecting...</div>
+</div>
+
+<script>
+const events = document.getElementById('events')
+const uptimeEl = document.getElementById('uptime')
+const msgCountEl = document.getElementById('msgCount')
+const agentCountEl = document.getElementById('agentCount')
+const agentTable = document.getElementById('agentTable')
+let msgCount = 0
+let agents = new Map()
+
+function addEvent(type, text, time) {
+  const div = document.createElement('div')
+  div.className = `event event-${type}`
+  const ts = time ? new Date(time).toTimeString().slice(0,8) : new Date().toTimeString().slice(0,8)
+  div.innerHTML = `<span class="timestamp">${ts}</span>${text}`
+  events.appendChild(div)
+  events.scrollTop = events.scrollHeight
+}
+
+function updateAgents() {
+  const tbody = agentTable.querySelector('tbody') || agentTable.createTBody()
+  tbody.innerHTML = ''
+  for (const [id, agent] of agents) {
+    const tr = document.createElement('tr')
+    tr.innerHTML = `<td>${id}</td><td>${agent.name}</td><td class="status-${agent.status}">${agent.status}</td>`
+    tbody.appendChild(tr)
+  }
+  agentCountEl.textContent = agents.size
+}
+
+// 通过 SSE 连接
+const evtSource = new EventSource('/v1/events')
+evtSource.onopen = () => {
+  events.innerHTML = '<div class="event event-system">Connected to event stream</div>'
+}
+
+evtSource.onmessage = (e) => {
+  try {
+    const data = JSON.parse(e.data)
+    if (data.type === 'connected') {
+      uptimeEl.textContent = new Date().toTimeString().slice(0,8)
+      return
+    }
+    if (data.type === 'envelope') {
+      msgCount++
+      msgCountEl.textContent = msgCount
+
+      const env = data.envelope
+      const role = env.direction === 'inbound' ? 'user' : 'agent'
+      const text = (env.payload?.text || '(empty)').slice(0, 80)
+      addEvent(role, `[${env.agent_id}] ${text}`, data.timestamp)
+
+      // 跟踪 Agent
+      if (!agents.has(env.agent_id)) {
+        agents.set(env.agent_id, { name: env.agent_id, status: 'idle' })
+        updateAgents()
+      }
+    }
+  } catch {}
+}
+
+evtSource.onerror = () => {
+  events.innerHTML = '<div class="event event-error">Connection lost. Reconnecting...</div>'
+}
+</script>
+</body>
+</html>

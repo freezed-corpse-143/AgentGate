@@ -1,0 +1,47 @@
+{
+  "name": "agentgate",
+  "version": "0.1.0",
+  "description": "Multi-channel agent communication infrastructure — unified Envelope, Channel Adapters, Message Bus, and Agent Runtime",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": "dist/index.js",
+  "scripts": {
+    "build": "tsc && node -e \"const f=require('fs');const d='agentgate-plugin/dist';if(!f.existsSync(d)||f.readdirSync(d).length===0){f.cpSync('dist',d,{recursive:true});console.log('[build] Plugin dist synced')}\"",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --exclude tests/e2e/**",
+    "test:watch": "vitest",
+    "test:telegram": "vitest run tests/e2e/telegram_adapter.test.ts",
+    "test:unit": "vitest run tests/unit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "commander": "^15.0.0",
+    "express": "^4.18.0",
+    "grammy": "^1.21.0",
+    "js-yaml": "^4.2.0",
+    "ssh2": "^1.17.0",
+    "uuid": "^9.0.0",
+    "ws": "^8.16.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^20.11.0",
+    "@types/ssh2": "^1.15.5",
+    "@types/uuid": "^9.0.7",
+    "@types/ws": "^8.5.10",
+    "typescript": "^5.4.0",
+    "vitest": "^4.1.8"
+  },
+  "keywords": [
+    "agent",
+    "communication",
+    "telegram",
+    "mcp",
+    "channel"
+  ],
+  "license": "MIT"
+}
