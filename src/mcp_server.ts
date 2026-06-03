@@ -199,16 +199,18 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
 
     case 'reply': {
       const text = args.text as string
-      const targetAgent = args.target_agent_id as string | undefined
       const convId = args.conv_id as string
       const msgs = conversationStore.getMessages(convId, { limit: 1 })
       const original = msgs[0]
+      // 推断回复目标: 显式 target_agent_id > 原发送者(channel_user_id) > 原所有者(agent_id) > 自身
+      const senderId = original?.channel_user_id || original?.agent_id
+      const replyTarget = (args.target_agent_id as string | undefined) || senderId
       const response: Envelope = {
         message_id: `mcp_${Date.now().toString(36)}`,
         trace_id: original?.metadata?.trace_id as string ?? `trace_${Date.now().toString(36)}`,
         channel: original?.channel ?? 'agentgate',
-        channel_user_id: original?.channel_user_id ?? config.server.defaultAgent,
-        agent_id: targetAgent ?? config.server.defaultAgent,
+        channel_user_id: config.server.defaultAgent,
+        agent_id: replyTarget ?? config.server.defaultAgent,
         conversation_id: convId, direction: 'outbound', type: 'agent_response',
         payload: { text }, timestamp: new Date().toISOString(),
       }
@@ -218,10 +220,12 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         channel: response.channel, channel_user_id: response.channel_user_id,
         timestamp: response.timestamp, metadata: { trace_id: response.trace_id },
       })
-      if (targetAgent && targetAgent !== config.server.defaultAgent) {
-        bus.publish(`agent.${targetAgent}.inbound`, response)
+      if (replyTarget && replyTarget !== config.server.defaultAgent) {
+        // 跨实例回复: 通过 Bridge 转发到目标 agent 的 inbound topic
+        bus.publish(`agent.${replyTarget}.inbound`, response)
       } else {
-        bus.publish(`agent.${response.agent_id}.outbound`, response)
+        // 本地回复: 走 outbound 信道
+        bus.publish(`agent.${config.server.defaultAgent}.outbound`, response)
       }
       return { content: [{ type: 'text', text: drainPending(`replied to ${convId}`) }] }
     }
