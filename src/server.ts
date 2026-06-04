@@ -12,6 +12,7 @@ import { SessionRouter } from './sessions/router.js'
 import { OutboundDispatcher } from './bus/outbound_dispatcher.js'
 import { RESTAdapter } from './channels/rest_adapter.js'
 import { TelegramAdapter } from './channels/telegram_adapter.js'
+import { BroadcastAdapter } from './channels/broadcast_adapter.js'
 import type { TelegramChannelConfig } from './config.js'
 import { SSHAdapter } from './channels/ssh_adapter.js'
 import { ConversationStore } from './storage/conversation_store.js'
@@ -86,6 +87,11 @@ export async function startServer(config: AgentGateConfig, opts?: ServerOptions)
       sa.onMessage((raw: RawMessage) => { gateway.receive(raw).catch(err => console.error(`[Gateway] Error: ${err}`)) })
       adapters.push(sa)
     }
+
+    // 广播信道（始终启用）
+    const ba = new BroadcastAdapter(bus)
+    ba.onMessage((raw: RawMessage) => { gateway.receive(raw).catch(err => console.error(`[Gateway] Error: ${err}`)) })
+    adapters.push(ba)
 
     const dispatcher = new OutboundDispatcher(adapters)
     dispatcher.attach(bus)

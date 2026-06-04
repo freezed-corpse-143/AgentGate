@@ -6,7 +6,7 @@
 
 // ─── 信道类型 ───────────────────────────────────────────────────
 
-export type ChannelType = 'telegram' | 'rest' | 'websocket' | 'ssh' | 'tailscale' | 'agentgate'
+export type ChannelType = 'telegram' | 'rest' | 'websocket' | 'ssh' | 'tailscale' | 'agentgate' | 'broadcast'
 
 // ─── Envelope 方向 ──────────────────────────────────────────────
 
