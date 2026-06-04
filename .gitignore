@@ -1,6 +1,5 @@
 node_modules/
-dist/
-*.tmp
+/dist/
 .agentgate/
 
 # Editor / IDE / tooling
@@ -9,11 +8,16 @@ dist/
 .codegraph/
 .reasonix/
 
-# Plugin wrapper (built from src, tracked in repo for plugin install)
+# Plugin wrapper
 agentgate-plugin/node_modules/
 
-# Dev / generated
-browser/
+# Dev / generated / temp
+.tmp/
 output/
+browser/
 plugins/
+*.tmp
 reasonix.toml
+
+# Environment (contains secrets — never commit)
+.env

@@ -1,6 +1,0 @@
-{
-  "name": "agentgate",
-  "description": "AgentGate multi-agent communication channel — direct context injection into Claude sessions. Enables agent-to-agent messaging via MessageBus.",
-  "version": "0.1.0",
-  "keywords": ["agent", "communication", "channel", "mcp", "message-bus"]
-}
