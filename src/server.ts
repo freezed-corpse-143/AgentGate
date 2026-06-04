@@ -13,6 +13,7 @@ import { OutboundDispatcher } from './bus/outbound_dispatcher.js'
 import { RESTAdapter } from './channels/rest_adapter.js'
 import { TelegramAdapter } from './channels/telegram_adapter.js'
 import { BroadcastAdapter } from './channels/broadcast_adapter.js'
+import { SubscriptionManager } from './subscriptions/manager.js'
 import type { TelegramChannelConfig } from './config.js'
 import { SSHAdapter } from './channels/ssh_adapter.js'
 import { ConversationStore } from './storage/conversation_store.js'
@@ -62,6 +63,8 @@ export async function startServer(config: AgentGateConfig, opts?: ServerOptions)
   const gateway = new ChannelGateway({ bindingStore, handshake, bus, defaultAgentId: config.server.defaultAgent })
   const adapters: ChannelAdapter[] = []
 
+  let subManager: SubscriptionManager | null = null
+
   if (!opts?.headless) {
     if (config.channels.rest?.enabled) {
       const ra = new RESTAdapter({ port: config.channels.rest.port, host: config.channels.rest.host, handshake, conversationStore, bus })
@@ -93,6 +96,13 @@ export async function startServer(config: AgentGateConfig, opts?: ServerOptions)
     ba.onMessage((raw: RawMessage) => { gateway.receive(raw).catch(err => console.error(`[Gateway] Error: ${err}`)) })
     adapters.push(ba)
 
+    // 订阅管理器
+    subManager = new SubscriptionManager({
+      bus,
+      getAdapters: () => adapters,
+    })
+    subManager.start()
+
     const dispatcher = new OutboundDispatcher(adapters)
     dispatcher.attach(bus)
 
@@ -115,6 +125,7 @@ export async function startServer(config: AgentGateConfig, opts?: ServerOptions)
 
   const shutdown = async () => {
     console.error('[AgentGate] Shutting down...')
+    subManager?.stop()
     if (conversationSync) conversationSync.stop()
     if (bridge) bridge.stop()
     for (const adapter of adapters) { try { await adapter.stop() } catch {} }
