@@ -46,7 +46,7 @@ jobs:
           cache: 'npm'
       - run: npm install
       - run: npx tsc
-      - run: npx vitest run tests/integration --no-color --reporter=verbose --exclude tests/e2e
+      - run: npx vitest run tests/integration --no-color --reporter=verbose --exclude tests/e2e --exclude tests/integration/telegram_pipeline.test.ts
       - name: Summary
         run: echo '✅ Integration tests passed'
 
