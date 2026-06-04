@@ -16,7 +16,7 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
-      - run: npm ci
+      - run: npm install
       - run: npx tsc --noEmit
       - name: Summary
         run: echo '✅ TypeScript typecheck passed'
@@ -30,7 +30,7 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
-      - run: npm ci
+      - run: npm install
       - run: npx vitest run tests/unit --no-color --reporter=verbose
       - name: Summary
         run: echo '✅ Unit tests passed'
@@ -44,7 +44,7 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
-      - run: npm ci
+      - run: npm install
       - run: npx tsc
       - run: npx vitest run tests/integration --no-color --reporter=verbose --exclude tests/e2e
       - name: Summary
@@ -60,7 +60,7 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
-      - run: npm ci
+      - run: npm install
       - run: npm run build
       - name: Verify build output
         run: |
