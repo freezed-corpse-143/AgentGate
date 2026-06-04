@@ -1,5 +1,9 @@
 # AgentGate — Claude Code 多 Agent 通信插件
 
+[![CI](https://github.com/freezed-corpse-143/AgentGate/actions/workflows/ci.yml/badge.svg)](https://github.com/freezed-corpse-143/AgentGate/actions/workflows/ci.yml)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.4-blue)](https://www.typescriptlang.org/)
+[![Node](https://img.shields.io/badge/Node-%3E%3D22-brightgreen)](https://nodejs.org/)
+
 AgentGate 是一个 **Claude Code MCP 插件**，利用 `notifications/claude/channel` 机制将消息自动注入到 Claude 会话上下文中，并通过去中心化的 Bridge v2 协议实现多 Agent 间的 P2P 直连通信。
 
 **不依赖 Telegram API 或任何外部服务。** 核心机制参考官方 Telegram 插件的上下文注入模式。
@@ -241,7 +245,14 @@ claude --dangerously-load-development-channels server:agentgate
 
 ## 参考
 
+### 文档
 - [docs/BRIDGE_PROTOCOL.md](docs/BRIDGE_PROTOCOL.md) — Bridge v2 协议
 - [docs/CLAUDE_COMMS.md](docs/CLAUDE_COMMS.md) — channel 协议分析与实测报告
 - [docs/DEBUG.md](docs/DEBUG.md) — 调试指南
 - [docs/SSH_MESH.md](docs/SSH_MESH.md) — SSH 跨主机组网方案
+- [docs/TAILSCALE_MESH.md](docs/TAILSCALE_MESH.md) — Tailscale 跨主机组网方案
+
+### CI/CD
+- `.github/workflows/ci.yml` — GitHub Actions: typecheck + unit tests + integration tests + build
+- `Dockerfile` — 多阶段构建，生产镜像仅 100MB+
+- 测试: `npm test`（unit + integration，排除 e2e），`npm run typecheck`

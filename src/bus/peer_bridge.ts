@@ -179,6 +179,8 @@ export interface BridgeAgentOptions {
   registryHost?: string
   /** 注册中心端口。默认 8444 */
   registryPort?: number
+  /** 向注册中心声明的本机地址。跨机器通信时设为本机的 Tailscale IP 或公网 IP */
+  advertiseHost?: string
 }
 
 /**
@@ -215,12 +217,16 @@ export class BridgeAgent {
   // 是否自举为注册中心
   private isRegistryBootstrap: boolean = false
 
+  // 向注册中心声明的本机地址（默认 127.0.0.1，Tailscale 时设 100.x.x.x）
+  private advertiseHost: string
+
   constructor(opts: BridgeAgentOptions) {
     this.agentId = opts.agentId
     this.bus = opts.bus
     this.listenPort = opts.listenPort ?? 0
     this.registryHost = opts.registryHost ?? '127.0.0.1'
     this.registryPort = opts.registryPort ?? DEFAULT_REGISTRY_PORT
+    this.advertiseHost = opts.advertiseHost || process.env.AGENTGATE_BRIDGE_HOST || '127.0.0.1'
   }
 
   get port(): number { return this.actualPort }
@@ -341,7 +347,7 @@ export class BridgeAgent {
         // 发送 REGISTER
         this.sendToRegistry({
           type: 'register', agent_id: this.agentId,
-          host: '127.0.0.1', port: this.actualPort,
+          host: this.advertiseHost, port: this.actualPort,
           ts: new Date().toISOString(),
         })
         resolve(true)
@@ -400,7 +406,7 @@ export class BridgeAgent {
     s.connect(peer.port, peer.host, () => {
       peer.socket = s
       // 发送 hello
-      s.write(encode({ type: 'register', agent_id: this.agentId, host: '127.0.0.1', port: this.actualPort, ts: new Date().toISOString() }))
+      s.write(encode({ type: 'register', agent_id: this.agentId, host: this.advertiseHost, port: this.actualPort, ts: new Date().toISOString() }))
     })
     const buf: Buffer[] = [Buffer.alloc(0)]
     s.on('data', (chunk) => {

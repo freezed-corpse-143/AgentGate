@@ -1,0 +1,17 @@
+node_modules/
+dist/
+.git/
+.github/
+tests/
+*.md
+.vscode/
+.claude/
+.codebase-memory/
+.codegraph/
+.reasonix/
+.tmp/
+output/
+browser/
+plugins/
+*.log
+.env

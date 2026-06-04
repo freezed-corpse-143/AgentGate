@@ -1,51 +1,61 @@
 /**
  * 集成测试: ConversationStore 跨进程同步
  *
- * 验证两个独立 ConversationStore 通过 Bridge 同步消息记录。
+ * 验证两个独立 ConversationStore 通过 Bridge 网络同步消息记录。
+ * 使用新的 Bridge v2 架构 (RegistryServer + BridgeAgent)。
  *
  * 架构:
- *   Store A → onAppend → Bus A → BridgeClient A → [BridgeServer]
- *     → BridgeClient B → Bus B → ConversationSync B → Store B
+ *   Store A → onAppend → Bus A → BridgeAgent A ──┐
+ *                                                  ├─ RegistryServer
+ *   Store B → onAppend → Bus B → BridgeAgent B ──┘
+ *     → 收到 _system.conversation.sync → ConversationSync B → Store B
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { BridgeAgent } from '../../src/bus/peer_bridge.js'
+import { BridgeAgent, RegistryServer } from '../../src/bus/peer_bridge.js'
 import { MemoryBus } from '../../src/bus/memory_bus.js'
 import { ConversationStore } from '../../src/storage/conversation_store.js'
 import { ConversationSync } from '../../src/storage/conversation_sync.js'
 import type { MessageRecord } from '../../src/storage/conversation_store.js'
+import { createServer as createNetServer } from 'net'
 
 // ─── 辅助函数 ──────────────────────────────────────────────────
 
-async function startBridge(): Promise<{ server: BridgeServer; port: number }> {
-  const server = new BridgeServer({ port: 0, host: '127.0.0.1' })
-  await server.start()
-  const addr = (server as any).server?.address()
-  const port = typeof addr === 'object' && addr ? addr.port : 0
-  return { server, port }
+async function findFreePort(): Promise<number> {
+  return new Promise((resolve) => {
+    const s = createNetServer()
+    s.listen(0, () => {
+      const port = (s.address() as any).port
+      s.close(() => resolve(port))
+    })
+  })
 }
 
 interface SyncedProcess {
   bus: MemoryBus
   store: ConversationStore
   sync: ConversationSync
-  client: BridgeClient
+  bridge: BridgeAgent
 }
 
 async function createSyncedProcess(
-  port: number,
-  nodeId: string,
+  registryHost: string,
+  registryPort: number,
+  agentId: string,
 ): Promise<SyncedProcess> {
   const bus = new MemoryBus()
   const store = new ConversationStore()
-  const client = new BridgeClient({
-    host: '127.0.0.1', port,
-    nodeId, quiet: true,
+  const bridge = new BridgeAgent({
+    agentId,
+    bus,
+    registryHost,
+    registryPort,
   })
-  client.attach(bus)
-  await new Promise(r => setTimeout(r, 400))
+  await bridge.start()
+  // 等 BridgeAgent 完成注册和 peer 发现
+  await new Promise(r => setTimeout(r, 500))
 
   const sync = new ConversationSync(bus, store)
-  return { bus, store, sync, client }
+  return { bus, store, sync, bridge }
 }
 
 function makeRecord(overrides: Partial<MessageRecord> = {}): MessageRecord {
@@ -65,25 +75,25 @@ function makeRecord(overrides: Partial<MessageRecord> = {}): MessageRecord {
 // ─── 测试 ──────────────────────────────────────────────────────
 
 describe('ConversationStore 跨进程同步', () => {
-  let bridge: BridgeServer
-  let port: number
+  let registry: RegistryServer
+  let registryPort: number
   let procA: SyncedProcess
   let procB: SyncedProcess
 
   beforeEach(async () => {
-    const s = await startBridge()
-    bridge = s.server
-    port = s.port
+    registryPort = await findFreePort()
+    registry = new RegistryServer({ port: registryPort, host: '127.0.0.1' })
+    await registry.start()
 
-    procA = await createSyncedProcess(port, 'node-store-A')
-    procB = await createSyncedProcess(port, 'node-store-B')
+    procA = await createSyncedProcess('127.0.0.1', registryPort, 'store-A')
+    procB = await createSyncedProcess('127.0.0.1', registryPort, 'store-B')
   })
 
   afterEach(async () => {
-    procA.client.disconnect()
-    procB.client.disconnect()
+    procA.bridge.stop()
+    procB.bridge.stop()
     await new Promise(r => setTimeout(r, 300))
-    bridge.stop()
+    registry.stop()
   })
 
   it('Store A 追加消息应同步到 Store B', async () => {
@@ -95,7 +105,7 @@ describe('ConversationStore 跨进程同步', () => {
     })
 
     procA.store.appendMessage(record)
-    await new Promise(r => setTimeout(r, 1000))
+    await new Promise(r => setTimeout(r, 1500))
 
     const convB = procB.store.getConversation('conv_sync_ab')
     expect(convB).toBeDefined()
@@ -114,7 +124,7 @@ describe('ConversationStore 跨进程同步', () => {
     })
 
     procB.store.appendMessage(record)
-    await new Promise(r => setTimeout(r, 1000))
+    await new Promise(r => setTimeout(r, 1500))
 
     const convA = procA.store.getConversation('conv_sync_ba')
     expect(convA).toBeDefined()
@@ -133,26 +143,19 @@ describe('ConversationStore 跨进程同步', () => {
     })
 
     procA.store.appendMessage(record)
-    await new Promise(r => setTimeout(r, 1000))
+    await new Promise(r => setTimeout(r, 1500))
 
     // B 应至少收到 1 次（A→B）
     const convB = procB.store.getConversation('conv_sync_loop')
     expect(convB).toBeDefined()
     expect(convB!.message_count).toBeGreaterThanOrEqual(1)
 
-    // B 应至少收到 1 条
-    expect(convB!.message_count).toBeGreaterThanOrEqual(1)
-
     const msgsB = procB.store.getMessages('conv_sync_loop')
+    expect(msgsB.some(m => m.text === 'loop check')).toBe(true)
 
-    // B 应有去重后的消息文本
-    const uniqueTextsB = [...new Set(msgsB.map(m => m.text))]
-    expect(uniqueTextsB).toContain('loop check')
-
-    // 回路保护应确保不会无限循环（实际测试中 1s 内约 18 条，但会停止）
-    // 如果无限循环在 1s 内会生成数千条
+    // 回路保护应确保不会无限循环
     const totalMsgs = msgsB.length
-    expect(totalMsgs).toBeLessThanOrEqual(100)
+    expect(totalMsgs).toBeLessThanOrEqual(50)
   })
 
   it('多条消息应全部同步', async () => {
@@ -165,10 +168,10 @@ describe('ConversationStore 跨进程同步', () => {
         conversation_id: 'conv_sync_multi',
       })
       procA.store.appendMessage(record)
-      await new Promise(r => setTimeout(r, 200))
+      await new Promise(r => setTimeout(r, 300))
     }
 
-    await new Promise(r => setTimeout(r, 1500))
+    await new Promise(r => setTimeout(r, 2000))
 
     // B 应收到全部 3 条去重后的消息
     const msgsB = procB.store.getMessages('conv_sync_multi')
