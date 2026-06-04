@@ -9,8 +9,8 @@ dist/
 .codegraph/
 .reasonix/
 
-# Plugin wrapper (flattened to root)
-agentgate-plugin/
+# Plugin wrapper (built from src, tracked in repo for plugin install)
+agentgate-plugin/node_modules/
 
 # Dev / generated
 browser/

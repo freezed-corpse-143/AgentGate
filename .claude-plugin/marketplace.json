@@ -1,0 +1,42 @@
+{
+  "name": "AgentGate",
+  "owner": {
+    "name": "freezed-corpse-143"
+  },
+  "description": "Multi-agent communication infrastructure for Claude Code",
+  "plugins": [
+    {
+      "name": "agentgate",
+      "source": "./agentgate-plugin",
+      "displayName": "AgentGate",
+      "description": "Multi-channel agent communication with Bridge P2P mesh, Telegram/SSH/REST adapters, and cross-process message sync",
+      "version": "0.1.0",
+      "author": {
+        "name": "freezed-corpse-143"
+      },
+      "homepage": "https://github.com/freezed-corpse-143/AgentGate",
+      "repository": "https://github.com/freezed-corpse-143/AgentGate",
+      "license": "MIT",
+      "keywords": ["agent", "communication", "mcp", "bridge", "p2p", "telegram"],
+      "category": "infrastructure",
+      "mcpServers": {
+        "agentgate": {
+          "command": "node",
+          "args": [
+            "${CLAUDE_PLUGIN_ROOT}/dist/mcp_server.js",
+            "--agent-id",
+            "${AGENTGATE_DEFAULT_AGENT}"
+          ],
+          "env": {
+            "AGENTGATE_DIR": "${CLAUDE_PLUGIN_DATA}",
+            "AGENTGATE_DEFAULT_AGENT": "${user_config.AGENTGATE_DEFAULT_AGENT}",
+            "AGENTGATE_BRIDGE_PORT": "${user_config.AGENTGATE_BRIDGE_PORT}",
+            "AGENTGATE_REGISTRY_HOST": "${user_config.AGENTGATE_REGISTRY_HOST}",
+            "AGENTGATE_BRIDGE_HOST": "${user_config.AGENTGATE_BRIDGE_HOST}"
+          }
+        }
+      },
+      "strict": false
+    }
+  ]
+}
