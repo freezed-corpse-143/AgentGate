@@ -7,7 +7,7 @@
   "plugins": [
     {
       "name": "agentgate",
-      "source": "./agentgate-plugin",
+      "source": ".",
       "displayName": "AgentGate",
       "description": "Multi-channel agent communication with Bridge P2P mesh, Telegram/SSH/REST adapters, and cross-process message sync",
       "version": "0.1.0",

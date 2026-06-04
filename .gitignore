@@ -1,5 +1,4 @@
 node_modules/
-/dist/
 .agentgate/
 
 # Editor / IDE / tooling
@@ -7,9 +6,6 @@ node_modules/
 .codebase-memory/
 .codegraph/
 .reasonix/
-
-# Plugin wrapper
-agentgate-plugin/node_modules/
 
 # Dev / generated / temp
 .tmp/
