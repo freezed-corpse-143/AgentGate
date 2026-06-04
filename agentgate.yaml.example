@@ -13,10 +13,19 @@ channels:
     host: 0.0.0.0
 
   # Telegram Bot 信道 (可选)
+  # 方式 A: 单 Bot（向后兼容）
   telegram:
     enabled: false
     token: ""                 # 也可通过 TELEGRAM_BOT_TOKEN 设置
     apiRoot: ""               # 自定义 API 根 (测试用)
+
+  # 方式 B: 多 Bot 实例（每个独立 token，同时运行）
+  telegrams:
+    - token: "123456:AABBCC"  # 第一个 Bot
+      allowFrom: [admin]      # 可选：限制用户
+    - token: "789012:DDEEFF"  # 第二个 Bot
+      # allowFrom 不设＝允许所有人
+    # 方式 C: 通过环境变量（启动时设 TELEGRAM_BOT_TOKEN）
 
 # 预注册 Agent
 agents:
