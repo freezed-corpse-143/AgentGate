@@ -12,6 +12,7 @@ import { SessionRouter } from './sessions/router.js'
 import { OutboundDispatcher } from './bus/outbound_dispatcher.js'
 import { RESTAdapter } from './channels/rest_adapter.js'
 import { TelegramAdapter } from './channels/telegram_adapter.js'
+import type { TelegramChannelConfig } from './config.js'
 import { SSHAdapter } from './channels/ssh_adapter.js'
 import { ConversationStore } from './storage/conversation_store.js'
 import { ConversationSync } from './storage/conversation_sync.js'
@@ -66,10 +67,19 @@ export async function startServer(config: AgentGateConfig, opts?: ServerOptions)
       ra.onMessage((raw: RawMessage) => { gateway.receive(raw).catch(err => console.error(`[Gateway] Error: ${err}`)) })
       adapters.push(ra)
     }
-    if (config.channels.telegram?.enabled && config.channels.telegram.token) {
-      const ta = new TelegramAdapter({ token: config.channels.telegram.token, apiRoot: config.channels.telegram.apiRoot, allowFrom: config.channels.telegram.allowFrom })
+    // 多 Telegram Bot 实例优先，向后兼容单实例
+    const telegramConfigs: TelegramChannelConfig[] = [
+      ...(config.channels.telegrams ?? []),
+      ...(config.channels.telegram?.enabled && config.channels.telegram.token
+        ? [config.channels.telegram]
+        : []),
+    ]
+    for (const tc of telegramConfigs) {
+      if (!tc.enabled || !tc.token) continue
+      const ta = new TelegramAdapter({ token: tc.token, apiRoot: tc.apiRoot, allowFrom: tc.allowFrom })
       ta.onMessage((raw: RawMessage) => { gateway.receive(raw).catch(err => console.error(`[Gateway] Error: ${err}`)) })
       adapters.push(ta)
+      console.error(`[AgentGate]   Telegram: bot=***${tc.token.slice(-6)} users=${(tc.allowFrom ?? ['all']).join(',')}`)
     }
     if (config.channels.ssh?.enabled) {
       const sa = new SSHAdapter({ port: config.channels.ssh.port, host: config.channels.ssh.host, users: config.channels.ssh.users })

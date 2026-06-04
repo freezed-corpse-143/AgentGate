@@ -53,7 +53,10 @@ export interface LoggingConfig {
 export interface AgentGateConfig {
   server: { defaultAgent: string }
   channels: {
+    /** 单 Telegram Bot（向后兼容，优先级低于 telegrams） */
     telegram?: TelegramChannelConfig
+    /** 多 Telegram Bot 实例（每个独立 token） */
+    telegrams?: TelegramChannelConfig[]
     rest?: RestChannelConfig
     ssh?: SSHChannelConfig
   }
