@@ -16,6 +16,7 @@ import { homedir } from 'os'
 import { join } from 'path'
 import type { Envelope } from '../types.js'
 import type { MessageBus } from './memory_bus.js'
+import { RetryQueue } from './retry_queue.js'
 
 // ─── 常量 ──────────────────────────────────────────
 const DEFAULT_REGISTRY_PORT = 8444
@@ -220,6 +221,9 @@ export class BridgeAgent {
   // 向注册中心声明的本机地址（默认 127.0.0.1，Tailscale 时设 100.x.x.x）
   private advertiseHost: string
 
+  // 断点重试队列
+  private retryQueue: RetryQueue
+
   constructor(opts: BridgeAgentOptions) {
     this.agentId = opts.agentId
     this.bus = opts.bus
@@ -227,6 +231,14 @@ export class BridgeAgent {
     this.registryHost = opts.registryHost ?? '127.0.0.1'
     this.registryPort = opts.registryPort ?? DEFAULT_REGISTRY_PORT
     this.advertiseHost = opts.advertiseHost || process.env.AGENTGATE_BRIDGE_HOST || '127.0.0.1'
+
+    // 初始化重试队列
+    this.retryQueue = new RetryQueue({
+      getPeerSocket: (agentId) => {
+        const peer = this.peers.get(agentId)
+        return peer?.socket ?? null
+      },
+    })
   }
 
   get port(): number { return this.actualPort }
@@ -241,12 +253,18 @@ export class BridgeAgent {
     // 3. 启动心跳
     this.heartbeatTimer = setInterval(() => this.sendHeartbeats(), HEARTBEAT_INTERVAL)
 
-    // 4. 订阅本地 bus 消息，转发给远程 peer
+    // 4. 启动重试队列
+    this.retryQueue.start()
+
+    // 5. 订阅本地 bus 消息，转发给远程 peer
     this.subscribeBus()
   }
 
   stop(): void {
     if (this.heartbeatTimer) clearInterval(this.heartbeatTimer)
+
+    // 停止重试队列
+    this.retryQueue.stop()
 
     // 通知注册中心下线
     if (this.registryConnected) {
@@ -407,6 +425,8 @@ export class BridgeAgent {
       peer.socket = s
       // 发送 hello
       s.write(encode({ type: 'register', agent_id: this.agentId, host: this.advertiseHost, port: this.actualPort, ts: new Date().toISOString() }))
+      // 清空重试队列中给该 peer 的消息
+      this.retryQueue.drain(peer.agent_id)
     })
     const buf: Buffer[] = [Buffer.alloc(0)]
     s.on('data', (chunk) => {
@@ -462,17 +482,28 @@ export class BridgeAgent {
   private routeToPeer(targetAgentId: string, envelope: Envelope): void {
     if (targetAgentId === this.agentId) return // 本地消息，已通过 bus 直接处理
     const peer = this.peers.get(targetAgentId)
-    if (!peer || !peer.socket) return
+    const topic = `agent.${targetAgentId}.inbound`
+    if (!peer || !peer.socket) {
+      this.retryQueue.enqueue(envelope, targetAgentId, topic)
+      return
+    }
     try {
-      peer.socket.write(encode({ type: 'message', topic: `agent.${targetAgentId}.inbound`, envelope }))
-    } catch {}
+      peer.socket.write(encode({ type: 'message', topic, envelope }))
+    } catch {
+      this.retryQueue.enqueue(envelope, targetAgentId, topic)
+    }
   }
 
   private broadcastToPeers(topic: string, envelope: Envelope): void {
     const data = encode({ type: 'message', topic, envelope })
-    for (const [, p] of this.peers) {
-      if (!p.socket) continue
-      try { p.socket.write(data) } catch {}
+    for (const [aid, p] of this.peers) {
+      if (!p.socket) {
+        this.retryQueue.enqueue(envelope, aid, topic)
+        continue
+      }
+      try { p.socket.write(data) } catch {
+        this.retryQueue.enqueue(envelope, aid, topic)
+      }
     }
   }
 
