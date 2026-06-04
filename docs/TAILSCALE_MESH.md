@@ -1,39 +1,39 @@
-# AgentGate Tailscale 组网
+# AgentGate Tailscale Networking
 
-> 利用 Tailscale 的虚拟专用网络，让分布在不同机器上的 AgentGate agent 直接通信。
-> 零配置、零端口暴露、传输加密（WireGuard）。
-
----
-
-## 1. 背景
-
-Bridge v2 的 P2P 直连有两个硬性条件：
-- 每台机器需要一个**可达的 IP + 端口**
-- 防火墙/NAT 不能阻挡 TCP 连接
-
-SSH 隧道能解决但麻烦：手动配端口转发、端口动态变化要更新隧道、SSH 断开要重连。
-
-**Tailscale 在 OS 层建一个虚拟局域网**，每台机器获得一个固定的 Tailscale IP（`100.x.x.x`），从此所有机器「看起来在同一个交换机上」。AgentGate 不需要知道底层网络差异。
-
-### 与 SSH 隧道对比
-
-| 对比项 | SSH 隧道 | Tailscale |
-|--------|----------|-----------|
-| 安装 | 自带（Linux/Mac） | 需安装 Tailscale |
-| 配置 | 每端口一条 `-L` | `tailscale up` 一次 |
-| 端口动态变化 | 需更新隧道 | 不需要（直达机器） |
-| NAT 穿透 | ❌ 需要公网跳板机 | ✅ DERP 中继 |
-| 加密 | SSH 传输层 | WireGuard 传输层 |
-| 保活 | `ServerAliveInterval` | 内置心跳 |
-| 代码改动 | 0 | 0 |
+> Using Tailscale's virtual private network to enable direct communication between AgentGate agents on different machines.
+> Zero configuration, zero port exposure, encrypted transport (WireGuard).
 
 ---
 
-## 2. 安装与组网
+## 1. Background
 
-### 2.1 安装 Tailscale
+Bridge v2 P2P direct connections have two hard requirements:
+- Each machine needs a **reachable IP + port**
+- Firewall/NAT must not block TCP connections
 
-每台机器安装 Tailscale 并登录同一账号。
+SSH tunnels can solve this but are cumbersome: manual port forwarding, tunnel updates for dynamic ports, reconnection on SSH disconnect.
+
+**Tailscale creates a virtual LAN at the OS level**, giving each machine a fixed Tailscale IP (`100.x.x.x`). All machines then "appear to be on the same switch." AgentGate doesn't need to know about the underlying network differences.
+
+### Comparison with SSH Tunnels
+
+| Comparison | SSH Tunnel | Tailscale |
+|------------|-----------|-----------|
+| Installation | Built-in (Linux/Mac) | Requires Tailscale installation |
+| Configuration | One `-L` per port | `tailscale up` once |
+| Dynamic port changes | Need to update tunnel | Not needed (direct to machine) |
+| NAT traversal | ❌ Requires public jump host | ✅ DERP relays |
+| Encryption | SSH transport layer | WireGuard transport layer |
+| Keepalive | `ServerAliveInterval` | Built-in heartbeat |
+| Code changes | 0 | 0 |
+
+---
+
+## 2. Installation & Networking
+
+### 2.1 Install Tailscale
+
+Install Tailscale on each machine and log in to the same account.
 
 ```bash
 # Linux
@@ -44,79 +44,79 @@ sudo tailscale up
 brew install tailscale && tailscale up
 
 # Windows
-# 下载安装: https://tailscale.com/download
-# 运行后点击登录
+# Download: https://tailscale.com/download
+# Run and log in
 
-# 验证
+# Verify
 tailscale status
 # 100.x.x.x  machine-a
 # 100.x.x.y  machine-b
 ```
 
-### 2.2 验证连通性
+### 2.2 Verify Connectivity
 
 ```bash
 # Machine A
 ping 100.x.x.y
-# → 通
+# → reachable
 
 # Machine B
 ping 100.x.x.x
-# → 通
+# → reachable
 ```
 
 ---
 
-## 3. 用 Tailscale IP 启动 AgentGate
+## 3. Start AgentGate with Tailscale IPs
 
-### 3.1 架构图
+### 3.1 Architecture Diagram
 
 ```
 Machine A (Tailscale IP 100.1.2.3)       Machine B (Tailscale IP 100.1.2.4)
 ┌─────────────────────────┐             ┌─────────────────────────┐
 │ RegistryServer :8444    │◄────Tailscale────►│ agent-beta           │
-│ 监听 100.1.2.3:8444     │   WireGuard 加密  │ registryHost: 100.1.2.3│
-│                         │             │ bridge port: 自动       │
-│ agent-alpha             │             │ P2P 直达 Machine A      │
+│ Listening on 100.1.2.3  │   WireGuard Encrypt │ registryHost: 100.1.2.3│
+│                         │             │ bridge port: auto       │
+│ agent-alpha             │             │ P2P direct to Machine A │
 │  registryHost: 127.0.0.1│             └─────────────────────────┘
 └─────────────────────────┘
 ```
 
-**关键区别**：Tailscale 网络内的机器直接用 Tailscale IP 通信。BridgeAgent 的 `registryHost` 填 `100.x.x.x`，P2P 直连也通过 `100.x.x.x`。
+**Key difference**: Machines in the Tailscale network communicate using Tailscale IPs directly. BridgeAgent's `registryHost` is set to `100.x.x.x`, and P2P connections also go through `100.x.x.x`.
 
-### 3.2 启动注册中心（Machine A）
+### 3.2 Start Registry (Machine A)
 
 ```bash
-# Machine A — 监听在 Tailscale IP 上，这样其他机器能连
+# Machine A — listen on Tailscale IP so other machines can connect
 node dist/index.js bridge 8444
 
-# 默认监听 0.0.0.0:8444
-# 确认 Tailscale 网卡上能访问：
+# Default listens on 0.0.0.0:8444
+# Confirm reachable via Tailscale interface:
 # tailscale ip -4 → 100.1.2.3
 ```
 
-### 3.3 启动 agent-alpha（Machine A，本机）
+### 3.3 Start agent-alpha (Machine A, Local)
 
 ```bash
 # Machine A
 $env:AGENTGATE_DEFAULT_AGENT = "agent-alpha"
 node dist/index.js start --bridge
 
-# agent-alpha 连接 127.0.0.1:8444（同机 Registry）
-# P2P 端口自动分配
+# agent-alpha connects to 127.0.0.1:8444 (same-machine Registry)
+# P2P port auto-assigned
 ```
 
-### 3.4 启动 agent-beta（Machine B，跨机器）
+### 3.4 Start agent-beta (Machine B, Cross-Machine)
 
 ```bash
 # Machine B
 $env:AGENTGATE_DEFAULT_AGENT = "agent-beta"
-$env:AGENTGATE_REGISTRY_HOST = "100.1.2.3"   # Machine A 的 Tailscale IP
-$env:AGENTGATE_BRIDGE_HOST = "100.1.2.4"     # 本机 Tailscale IP（通知 peer 连这个地址）
+$env:AGENTGATE_REGISTRY_HOST = "100.1.2.3"   # Machine A's Tailscale IP
+$env:AGENTGATE_BRIDGE_HOST = "100.1.2.4"     # This machine's Tailscale IP (advertised to peers)
 node dist/index.js start --bridge
 ```
 
-关键日志：
+Key log output:
 ```
 [Bridge] Listening on 100.1.2.4:xxxxx
 [Bridge] Connected to registry at 100.1.2.3:8444
@@ -124,22 +124,22 @@ node dist/index.js start --bridge
 [Bridge] P2P connected to agent-alpha
 ```
 
-**没有隧道、没有端口转发、没有 SSH 保活。**
+**No tunnels, no port forwarding, no SSH keepalive.**
 
 ---
 
-## 4. 配置详解
+## 4. Configuration Details
 
-### 4.1 环境变量
+### 4.1 Environment Variables
 
-| 变量 | 值 | 说明 |
-|------|-----|------|
-| `AGENTGATE_REGISTRY_HOST` | `100.x.x.x` | 注册中心的 Tailscale IP |
-| `AGENTGATE_BRIDGE_HOST` | 本机 Tailscale IP | **新增/修改**：BridgeAgent 注册时用 Tailscale IP 而非 `127.0.0.1` |
+| Variable | Value | Description |
+|----------|-------|-------------|
+| `AGENTGATE_REGISTRY_HOST` | `100.x.x.x` | Registry's Tailscale IP |
+| `AGENTGATE_BRIDGE_HOST` | Local Tailscale IP | BridgeAgent registers with Tailscale IP instead of `127.0.0.1` |
 
-### 4.2 `advertiseHost` — 向注册中心声明本机地址
+### 4.2 `advertiseHost` — Declaring Local Address to Registry
 
-`BridgeAgentOptions` 中的 `advertiseHost` 字段解决了这个问题：
+The `BridgeAgentOptions.advertiseHost` field handles this:
 
 ```typescript
 export interface BridgeAgentOptions {
@@ -148,31 +148,31 @@ export interface BridgeAgentOptions {
   listenPort?: number
   registryHost?: string
   registryPort?: number
-  /** 向注册中心声明的本机地址。跨机器通信时设为本机的 Tailscale IP 或公网 IP */
+  /** Host address advertised to the registry. For cross-machine communication, set to local Tailscale IP or public IP */
   advertiseHost?: string
 }
 ```
 
-默认值为 `127.0.0.1`（向前兼容，单机场景不受影响）。
-跨机器时通过 `AGENTGATE_BRIDGE_HOST` 环境变量或编程方式设置。**此功能已实现，可直接使用。**
+Default value is `127.0.0.1` (backward-compatible, single-machine scenarios unaffected).
+For cross-machine, set via `AGENTGATE_BRIDGE_HOST` environment variable or programmatically. **This feature is implemented and ready to use.**
 
-### 4.3 完整配置示例
+### 4.3 Complete Configuration Example
 
 ```bash
-# Machine A（注册中心 + agent-alpha）
+# Machine A (Registry + agent-alpha)
 node dist/index.js bridge 8444
 
 $env:AGENTGATE_DEFAULT_AGENT = "agent-alpha"
-$env:AGENTGATE_BRIDGE_HOST = "100.1.2.3"   # 本机 Tailscale IP
+$env:AGENTGATE_BRIDGE_HOST = "100.1.2.3"   # Local Tailscale IP
 node dist/index.js start --bridge
 
-# Machine B（agent-beta）
+# Machine B (agent-beta)
 $env:AGENTGATE_DEFAULT_AGENT = "agent-beta"
-$env:AGENTGATE_REGISTRY_HOST = "100.1.2.3" # Machine A 的 Tailscale IP
-$env:AGENTGATE_BRIDGE_HOST = "100.1.2.4"   # 本机 Tailscale IP
+$env:AGENTGATE_REGISTRY_HOST = "100.1.2.3" # Machine A's Tailscale IP
+$env:AGENTGATE_BRIDGE_HOST = "100.1.2.4"   # Local Tailscale IP
 node dist/index.js start --bridge
 
-# Machine C（agent-gamma）
+# Machine C (agent-gamma)
 $env:AGENTGATE_DEFAULT_AGENT = "agent-gamma"
 $env:AGENTGATE_REGISTRY_HOST = "100.1.2.3"
 $env:AGENTGATE_BRIDGE_HOST = "100.1.2.5"
@@ -181,15 +181,15 @@ node dist/index.js start --bridge
 
 ---
 
-## 5. Tailscale 高阶技巧
+## 5. Tailscale Advanced Tips
 
-### 5.1 用 ACL 控制 agent 访问
+### 5.1 Using ACLs to Control Agent Access
 
 ```json
 // Tailscale ACL (https://login.tailscale.com/admin/acls)
 {
   "acls": [
-    // 只允许 agent 之间的 Bridge 端口通信
+    // Allow only Bridge port communication between agents
     {
       "action": "accept",
       "src":    ["tag:agent"],
@@ -202,41 +202,41 @@ node dist/index.js start --bridge
 }
 ```
 
-### 5.2 固定 Tailscale IP
+### 5.2 Fixed Tailscale IP
 
 ```bash
-# Tailscale 默认 IP 不变，但如果重新登录可能变化
-# 用 MagicDNS 更稳定：
+# Tailscale IPs don't change by default, but may change on re-login
+# Use MagicDNS for more stability:
 tailscale up --accept-dns
 
-# 然后直接用机器名：
+# Then use machine names directly:
 ping machine-a       # → 100.x.x.x
 ping machine-b       # → 100.x.x.y
 ```
 
-### 5.3 纯内网机器（无公网 IP）
+### 5.3 Internal-Only Machines (No Public IP)
 
-Tailscale 的 DERP 中继会自动处理 NAT 穿透。不需要公网跳板机。
-
----
-
-## 6. 与 SSH 隧道方案的选择
-
-| 你的环境 | 推荐方案 |
-|----------|---------|
-| 已有公网跳板机，不能装 Tailscale | SSH 隧道（`docs/SSH_MESH.md`） |
-| 机器都能装 Tailscale | **Tailscale**（本文档） |
-| 混合：部分能装 Tailscale，部分不能 | Tailscale 为主，SSH 隧道作为 fallback |
-| 只想单机测试 | 什么都不用做，`localhost` 直连 |
+Tailscale's DERP relays handle NAT traversal automatically. No public jump host needed.
 
 ---
 
-## 7. 小结
+## 6. Choosing Between SSH and Tailscale
 
-Tailscale 方案对 AgentGate 的收益：
+| Your Environment | Recommended Approach |
+|-----------------|---------------------|
+| Existing public jump host, can't install Tailscale | SSH tunnels (`docs/SSH_MESH.md`) |
+| All machines can install Tailscale | **Tailscale** (this document) |
+| Mixed: some can install Tailscale, some can't | Tailscale primary, SSH tunnel as fallback |
+| Single-machine test only | Nothing to do, `localhost` directly |
 
-- **零代码改动**（除了新增 `advertiseHost` 选项和 `AGENTGATE_BRIDGE_HOST` 环境变量）
-- **零端口管理**——不需要配 `-L` 转发，不需要关注动态端口
-- **自带加密**——WireGuard 传输层加密，无需改造 P2P 协议
-- **自动保活**——内置心跳，断线自动重连
-- **NAT 穿透**——DERP 中继，无需公网服务器
+---
+
+## 7. Summary
+
+Tailscale benefits for AgentGate:
+
+- **Zero code changes** (apart from adding `advertiseHost` option and `AGENTGATE_BRIDGE_HOST` environment variable)
+- **Zero port management** — no `-L` forwarding needed, no concern about dynamic ports
+- **Built-in encryption** — WireGuard transport layer encryption, no P2P protocol changes needed
+- **Auto-keepalive** — built-in heartbeat, automatic reconnection on disconnect
+- **NAT traversal** — DERP relays, no public server required

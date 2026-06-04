@@ -1,47 +1,46 @@
-# AgentGate Debug 指南
+# AgentGate Debug Guide
 
-> 双 Claude 通信调试手册 — 常见问题、诊断工具、协议分析
+> Dual Claude communication debugging manual — common issues, diagnostic tools, protocol analysis
 
 ---
 
-## 一、启动检查清单
+## 1. Startup Checklist
 
-### 1.1 前置条件
+### 1.1 Prerequisites
 
 ```
-□ Node.js 24+ 已安装
-□ npm run build 成功（node_modules\.bin\tsc.cmd）
-□ npm run build 成功
-□ node_modules/ 已安装
-□ ~/.claude.json 已配置 mcpServers.agentgate（含 --agent-id ${AGENTGATE_DEFAULT_AGENT}）
-□ ~/.claude.json 包含 tengu_harbor: true
+□ Node.js 24+ installed
+□ npm run build succeeded (node_modules\.bin\tsc.cmd)
+□ node_modules/ installed
+□ ~/.claude.json configured with mcpServers.agentgate (with --agent-id ${AGENTGATE_DEFAULT_AGENT})
+□ ~/.claude.json includes tengu_harbor: true
 ```
 
-### 1.2 启动命令
+### 1.2 Startup Commands
 
 ```powershell
-# 终端 A — agent-alpha
+# Terminal A — agent-alpha
 $env:AGENTGATE_DEFAULT_AGENT = "agent-alpha"
 claude --dangerously-load-development-channels server:agentgate
 
-# 终端 B — agent-beta
+# Terminal B — agent-beta
 $env:AGENTGATE_DEFAULT_AGENT = "agent-beta"
 claude --dangerously-load-development-channels server:agentgate
 ```
 
-> `~/.claude.json` 中必须已配置 `mcpServers.agentgate`，args 中包含 `--agent-id ${AGENTGATE_DEFAULT_AGENT}`。
-> 第一个启动的实例自动成为注册中心（:8444），后续实例自动发现并建立 P2P 直连。
+> `~/.claude.json` must have `mcpServers.agentgate` configured, args including `--agent-id ${AGENTGATE_DEFAULT_AGENT}`.
+> The first instance automatically becomes the registry (:8444), subsequent instances auto-discover and establish P2P connections.
 
-### 1.3 验证 MCP Server 启动
+### 1.3 Verify MCP Server Startup
 
-在 Claude 中输入任意内容，观察工具调用是否正常。MCP Server 的 stderr 输出被 Claude 捕获，不会显示在终端中。
+Type anything in Claude and observe if tools work correctly. MCP Server's stderr output is captured by Claude and not shown in the terminal.
 
-要直接测试 MCP Server 是否正常：
+To test MCP Server directly:
 
 ```bash
-# 模拟 Claude 启动 MCP Server（不带 Claude）
+# Simulate Claude starting MCP Server (without Claude)
 node dist/mcp_server.js
-# 预期输出（无 AGENTGATE_BRIDGE_ENABLED=false 时）：
+# Expected output (without AGENTGATE_BRIDGE_ENABLED=false):
 #   [AgentRegistry] Registered: default (Default Agent)
 #   [AgentRuntime] Started — agent.*.inbound (agents: [default])
 #   [BridgeServer] Listening on 0.0.0.0:8444
@@ -53,40 +52,39 @@ node dist/mcp_server.js
 
 ---
 
-## 二、常见问题
+## 2. Common Issues
 
-### 2.1 MCP 工具不可见
-
-```
-症状: Claude 说"没有找到 agentgate 工具"
-```
-
-**可能原因**:
-
-| 原因 | 检查方法 | 解决 |
-|------|---------|------|
-| dist 不存在 | `dir dist\mcp_server.js` | 确认项目已构建 |
-| 缺少 node_modules | `dir node_modules` | `npm install` |
-| 缺少 dist | `dir dist\mcp_server.js` | `npm run build` |
-| MCP Server 启动报错 | 直接运行 `node dist/mcp_server.js` 看报错 | 修复报错 |
-
-### 2.2 Bridge 无法连接
+### 2.1 MCP Tools Not Visible
 
 ```
-症状: 两个 Claude 各自能调用工具，但消息互相收不到
+Symptom: Claude says "no agentgate tools found"
 ```
 
-**诊断步骤**:
+**Possible causes:**
+
+| Cause | Check Method | Solution |
+|-------|-------------|----------|
+| dist doesn't exist | `dir dist\mcp_server.js` | Make sure project is built |
+| Missing node_modules | `dir node_modules` | `npm install` |
+| MCP Server startup error | Run `node dist/mcp_server.js` directly to see errors | Fix the error |
+
+### 2.2 Bridge Can't Connect
+
+```
+Symptom: Both Claude instances can use tools, but messages don't reach each other
+```
+
+**Diagnostic steps:**
 
 ```bash
-# 1. 检查端口占用
+# 1. Check port usage
 netstat -ano | findstr :8444
-# 应有 LISTENING 状态，PID 对应某个 node 进程
+# Should show LISTENING state, PID matches a node process
 
-# 2. 检查 node 进程
+# 2. Check node processes
 Get-Process -Name node | Where-Object { $_.CommandLine -match 'mcp_server' }
 
-# 3. 直接测试 bridge 连通性
+# 3. Direct bridge connectivity test
 node -e "
 const net = require('net');
 const s = new net.Socket();
@@ -99,146 +97,145 @@ s.on('error', (e) => console.log('ERROR:', e.message));
 "
 ```
 
-如果 bridge 未启动（端口未监听），检查 MCP Server 是否正常启动。
+If the bridge isn't started (port not listening), check if MCP Server started correctly.
 
-### 2.3 send_message 发送成功但对端收不到
+### 2.3 send_message Succeeds but Receiver Can't See
 
 ```
-症状: Claude A 显示"消息已发送"，但 Claude B 看不到
+Symptom: Claude A shows "message sent", but Claude B can't see it
 ```
 
-**检查链路**:
+**Check the chain:**
 
 ```
 Claude A → send_message handler → bus.publish(agent.agent-beta.inbound)
   → BridgeClient A → TCP → BridgeServer
     → BridgeClient B → bus.publish(agent.agent-beta.inbound)
-      → MCP Server B subscriber → agent_id 检查
+      → MCP Server B subscriber → agent_id check
         → conversationStore.appendMessage
         → pendingMessages.push
-        → mcp.notification (可能不工作)
+        → mcp.notification (may not work)
 ```
 
-**诊断**:
+**Diagnosis:**
 
 ```bash
-# 1. 验证 message 确实写入了 conversation store
+# 1. Verify message was written to conversation store
 Get-ChildItem $env:USERPROFILE\.agentgate\conversations\ | Sort-Object LastWriteTime -Descending | Select-Object -First 3 Name
 
-# 2. 检查文件内容
+# 2. Check file content
 Get-Content $env:USERPROFILE\.agentgate\conversations\conv_xxx.json | ConvertFrom-Json | Select-Object agent_id, text
 
-# 3. 在 Claude B 中运行
-"列出最近的对话"
+# 3. In Claude B, run
+"List recent conversations"
 ```
 
-### 2.4 `AGENTGATE_DEFAULT_AGENT` 使用的是 `default`
+### 2.4 `AGENTGATE_DEFAULT_AGENT` Always Shows `default`
 
 ```
-症状: conversation store 中所有消息的 agent_id 都是 "default"
+Symptom: All messages in conversation store show agent_id "default"
 ```
 
-**原因**: Claude 不将终端环境变量传给 MCP 子进程。
+**Cause**: Claude does not pass terminal environment variables to MCP subprocesses.
 
-**检查**:
+**Check:**
 
 ```bash
-# 查看 MCP Server 读取的 agent_id
+# View the agent_id read by MCP Server
 Get-Content $env:USERPROFILE\.agentgate\agent_id
 ```
 
-**修复**:
+**Fix:**
 
 ```bash
 echo agent-alpha > $env:USERPROFILE\.agentgate\agent_id
-# 必须重新启动 Claude
+# Must restart Claude
 ```
 
-### 2.5 端口 8444 被占用
+### 2.5 Port 8444 in Use
 
 ```
-症状: MCP Server 启动日志显示 "Bridge peer on :8444"
-      而不是 "Bridge hub on :8444"
+Symptom: MCP Server startup log shows "Bridge peer on :8444"
+       instead of "Bridge hub on :8444"
 ```
 
-**检查**:
+**Check:**
 
 ```bash
 netstat -ano | findstr :8444
-# 如果 PID 不是当前 Claude 的 MCP Server 进程
-# 说明有残留进程
+# If PID is not the current Claude's MCP Server process
+# there's a residual process
 
-# 杀死占用进程（根据实际的 PID）
+# Kill the occupying process (use actual PID)
 Stop-Process -Id <PID> -Force
 ```
 
-### 2.6 conversation store 文件冲突
+### 2.6 Conversation Store File Conflicts
 
 ```
-症状: list_conversations 返回了不属于当前 agent 的对话
+Symptom: list_conversations shows conversations that don't belong to the current agent
 ```
 
-**原因**: 所有 Claude 实例共享 `~/.agentgate/conversations/` 目录。
+**Cause**: All Claude instances share `~/.agentgate/conversations/` directory.
 
-**解决**: 测试前清理：
+**Solution**: Clean before testing:
 
 ```bash
 Remove-Item -Recurse -Force $env:USERPROFILE\.agentgate\conversations\
 ```
 
-### 2.7 MCP Server 启动失败（静默）
+### 2.7 MCP Server Silent Startup Failure
 
 ```
-症状: Claude 显示 "MCP servers failed" 且工具列表为空
+Symptom: Claude shows "MCP servers failed" and tool list is empty
 ```
 
-**诊断**:
+**Diagnosis:**
 
 ```bash
-# 模拟 Claude 启动 MCP Server
+# Simulate Claude starting MCP Server
 node dist/mcp_server.js 2>&1
 
-# 如果输出中不包含 "[AgentGate MCP] Running"
-# 说明启动过程有错误
+# If output doesn't include "[AgentGate MCP] Running"
+# there's a startup error
 ```
 
-**常见错误**:
+**Common errors:**
 
-| 错误 | 原因 | 解决 |
-|------|------|------|
-| `Cannot find module 'ssh2'` | 缺少 node_modules | `npm install` |
-| `import { Server as SshServer }` 语法错 | ssh2 的 CommonJS 兼容问题 | 确认使用 `import ssh2 from 'ssh2'` 模式 |
-| `ERR_SOCKET_BAD_PORT` | commander.js parseInt radix 问题 | 确认 CLI 使用 `(v) => parseInt(v, 10)` |
+| Error | Cause | Solution |
+|-------|-------|----------|
+| `Cannot find module 'ssh2'` | Missing node_modules | `npm install` |
+| `ERR_SOCKET_BAD_PORT` | commander.js parseInt radix issue | Use `(v) => parseInt(v, 10)` |
 
 ---
 
-## 三、诊断工具
+## 3. Diagnostic Tools
 
-### 3.1 快速诊断脚本
+### 3.1 Quick Diagnostic Script
 
 ```javascript
 // tests/diagnose_bridge.mjs
-// 启动两个 MCP Server，通过 bridge 发送消息并验证链路
-// 用法: node tests/diagnose_bridge.mjs
+// Starts two MCP Servers, sends a message via bridge, and verifies the chain
+// Usage: node tests/diagnose_bridge.mjs
 
 node tests/diagnose_bridge.mjs
-# 输出包含:
+# Output includes:
 #   [HIT] [AgentGate MCP] Channel message from agent-alpha: ...
-#   说明消息成功经过 bridge 到达对端
+#   Confirms message successfully reached the other side via bridge
 ```
 
-### 3.2 Bridge 探针
+### 3.2 Bridge Probe
 
 ```javascript
 // tests/probe.mjs
-// 连接 bridge 并监控消息
+// Connects to bridge and monitors messages
 node tests/probe.mjs
 ```
 
-### 3.3 Agent ID 验证
+### 3.3 Agent ID Verification
 
 ```bash
-# 验证 MCP Server 读取到正确的 agent_id
+# Verify MCP Server reads the correct agent_id
 node -e "
 const fs = require('fs');
 const p = require('path');
@@ -247,25 +244,25 @@ console.log('agent_id:', fs.readFileSync(f, 'utf8').trim());
 "
 ```
 
-### 3.4 端口清理
+### 3.4 Port Cleanup
 
 ```powershell
-# 杀死所有 MCP Server 进程（保留当前会话）
+# Kill all MCP Server processes (preserves current session)
 Get-Process -Name node | Where-Object { $_.CommandLine -match 'mcp_server' } | Stop-Process -Force
 ```
 
 ---
 
-## 四、MCP 协议调试
+## 4. MCP Protocol Debugging
 
-### 4.1 notification 格式
+### 4.1 Notification Format
 
 ```json
 {
   "jsonrpc": "2.0",
   "method": "notifications/claude/channel",
   "params": {
-    "content": "消息文本",
+    "content": "Message text",
     "meta": {
       "chat_id": "agent-alpha",
       "agent_id": "agent-beta",
@@ -278,29 +275,29 @@ Get-Process -Name node | Where-Object { $_.CommandLine -match 'mcp_server' } | S
 }
 ```
 
-### 4.2 MCP SDK 调用链路
+### 4.2 MCP SDK Call Chain
 
 ```
 Server.notification({ method, params })
   → Protocol.notification()
-    → 检查 this._transport 是否存在
+    → Check if this._transport exists
     → assertNotificationCapability(method)
       → switch(method):
-          'notifications/message'           → 需要 logging capability
-          'notifications/resources/*'       → 需要 resources capability
-          'notifications/tools/*'           → 需要 tools capability
-          'notifications/prompts/*'         → 需要 prompts capability
-          'notifications/cancelled'         → 始终允许
-          'notifications/progress'          → 始终允许
-          'notifications/claude/channel'    → 不在 switch 中 → 放行 ✅
+          'notifications/message'           → requires logging capability
+          'notifications/resources/*'       → requires resources capability
+          'notifications/tools/*'           → requires tools capability
+          'notifications/prompts/*'         → requires prompts capability
+          'notifications/cancelled'         → always allowed
+          'notifications/progress'          → always allowed
+          'notifications/claude/channel'    → not in switch → passes through ✅
     → transport.send(jsonRpcMessage)
       → StdioServerTransport.send()
         → process.stdout.write(JSON.stringify(message))
 ```
 
-### 4.3 tool 调用格式
+### 4.3 Tool Call Format
 
-向 `agent.agent-beta.inbound` 发送的 Envelope：
+Envelope sent to `agent.agent-beta.inbound`:
 
 ```json
 {
@@ -312,16 +309,16 @@ Server.notification({ method, params })
   "conversation_id": "conv_xxxxx",
   "direction": "inbound",
   "type": "text",
-  "payload": { "text": "你好" },
+  "payload": { "text": "Hello" },
   "timestamp": "2026-06-03T04:48:02.698Z"
 }
 ```
 
 ---
 
-## 五、环境检查
+## 5. Environment Check
 
-### 5.1 关键文件
+### 5.1 Key Files
 
 ```
 ~/.claude.json
@@ -329,60 +326,60 @@ Server.notification({ method, params })
   → cachedGrowthBookFeatures.tengu_harbor: true
 
 ~/.agentgate/agent_id
-  → 内容: agent-alpha 或 agent-beta
+  → content: agent-alpha or agent-beta
 
 ~/.agentgate/conversations/
-  → JSON 文件，每个对话一个文件
+  → JSON files, one per conversation
 
 C:\Projects\AgentGate\.mcp.json
-  → 指向 dist/mcp_server.js
+  → Points to dist/mcp_server.js
 ```
 
-### 5.2 关键环境变量
+### 5.2 Key Environment Variables
 
-| 变量 | 用途 | 默认值 |
-|------|------|--------|
-| `AGENTGATE_DEFAULT_AGENT` | Agent ID（已废弃，改用文件） | `default` |
-| `AGENTGATE_BRIDGE_PORT` | Bridge 端口 | `8444` |
-| `AGENTGATE_BRIDGE_HOST` | 远程 Bridge 地址 | `localhost` |
-| `AGENTGATE_BRIDGE_ENABLED` | 禁用 bridge（设为 false/0） | 自动启用 |
-| `AGENTGATE_DIR` | 状态目录 | `~/.agentgate` |
-
----
-
-## 六、已知问题
-
-| 问题 | 状态 | 说明 |
-|------|------|------|
-| notifications/claude/channel 不工作 | ⚠️ 未解决 | MCP SDK 已发送，但 Claude 不显示。可能限制 marketplace 插件 |
-| env 变量不传 MCP 子进程 | ✅ 已解决 | 改用文件读取 agent_id |
-| Telegram 同名通知格式完全一致却工作 | ❓ 原因不明 | 可能是 marketplace 安装与 --plugin-dir 差异 |
-| unbuned 提取的 JS 严重混淆 | ✅ 已确认 | 15MB minified，变量名单字母，无法定位具体逻辑 |
-| commander.js parseInt radix 问题 | ✅ 已修复 | 使用 `(v) => parseInt(v, 10)` |
+| Variable | Purpose | Default |
+|----------|---------|---------|
+| `AGENTGATE_DEFAULT_AGENT` | Agent ID (deprecated, use file) | `default` |
+| `AGENTGATE_BRIDGE_PORT` | Bridge port | `8444` |
+| `AGENTGATE_BRIDGE_HOST` | Remote Bridge address (for cross-machine) | `localhost` |
+| `AGENTGATE_BRIDGE_ENABLED` | Disable bridge (set to false/0) | auto-enabled |
+| `AGENTGATE_DIR` | State directory | `~/.agentgate` |
 
 ---
 
-## 七、恢复出厂设置
+## 6. Known Issues
 
-彻底清理测试状态：
+| Issue | Status | Notes |
+|-------|--------|-------|
+| notifications/claude/channel doesn't work | ⚠️ Unresolved | MCP SDK sends it, but Claude doesn't display. Possibly marketplace plugin limitation |
+| Env vars not passed to MCP subprocess | ✅ Fixed | Changed to file-based agent_id reading |
+| Telegram identical notification format works | ❓ Unknown cause | Possibly marketplace vs --plugin-dir difference |
+| unbuned extracted JS heavily obfuscated | ✅ Confirmed | 15MB minified, single-letter variable names, can't locate specific logic |
+| commander.js parseInt radix issue | ✅ Fixed | Using `(v) => parseInt(v, 10)` |
+
+---
+
+## 7. Factory Reset
+
+Complete test state cleanup:
 
 ```powershell
-# 1. 杀死所有 Claude
+# 1. Kill all Claude instances
 taskkill /f /im claude.exe
 
-# 2. 杀死所有 MCP Server
+# 2. Kill all MCP Server processes
 Get-Process -Name node | Where-Object { $_.CommandLine -match 'mcp_server' } | Stop-Process -Force
 
-# 3. 清理状态
+# 3. Clean state
 Remove-Item -Recurse -Force $env:USERPROFILE\.agentgate\ -ErrorAction SilentlyContinue
 
-# 4. 重新构建
+# 4. Rebuild
 cd C:\Projects\AgentGate
 npm run build
 
-# 5. 设置 agent_id
+# 5. Set agent_id
 echo agent-alpha > $env:USERPROFILE\.agentgate\agent_id
 
-# 6. 启动 Claude
+# 6. Start Claude
 claude --dangerously-load-development-channels server:agentgate
 ```

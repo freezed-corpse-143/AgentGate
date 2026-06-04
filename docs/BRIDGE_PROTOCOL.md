@@ -1,20 +1,19 @@
-# AgentGate Bridge 协议 v2
+# AgentGate Bridge Protocol v2
 
-> 去中心化 agent 注册与 P2P 通信协议。
-> Agent 通过阅读本文档了解如何配置端口、注册自身、发现其他 agent 并建立直连通信。
+> Decentralized agent registration and P2P communication protocol.
+> Agents read this document to learn how to configure ports, register themselves, discover other agents, and establish direct connections.
 
 ---
 
-## 0. 快速开始
+## 0. Quick Start
 
-### 前置条件
+### Prerequisites
 
 - Node.js 24+
-- `~/.claude.json` 已配置 `mcpServers.agentgate`（见下方）
-- 项目已构建：`node_modules\.bin\tsc.cmd`
-- 项目已构建：`npm run build`
+- `~/.claude.json` configured with `mcpServers.agentgate` (see below)
+- Project built: `npm run build`
 
-### 配置 `~/.claude.json`
+### Configure `~/.claude.json`
 
 ```json
 {
@@ -35,126 +34,127 @@
 }
 ```
 
-> `${AGENTGATE_DEFAULT_AGENT}` 是环境变量占位符，Claude 在启动 MCP 进程前会将其替换为当前环境变量的值。
-> 每个 Claude 实例设不同的值即可区分身份，无需修改配置文件。
+> `${AGENTGATE_DEFAULT_AGENT}` is an environment variable placeholder. Claude replaces it with the current env value before launching the MCP subprocess.
+> Each Claude instance can differentiate itself with a different value — no config file changes needed.
 
-### 单实例启动
+### Single Instance Start
 
 ```powershell
 $env:AGENTGATE_DEFAULT_AGENT = "agent-alpha"
 claude --dangerously-load-development-channels server:agentgate
 ```
 
-首次启动需按 Enter 确认危险模式警告。之后可加 `--dangerously-skip-permissions` 跳过确认。
+First launch requires pressing Enter to confirm the dangerous mode warning. Subsequent launches can use `--dangerously-skip-permissions`.
 
-### 双实例启动（两个终端）
+### Dual-Instance Start (Two Terminals)
 
 ```powershell
-# 终端 A
+# Terminal A
 $env:AGENTGATE_DEFAULT_AGENT = "agent-alpha"
 claude --dangerously-load-development-channels server:agentgate
 
-# 终端 B
+# Terminal B
 $env:AGENTGATE_DEFAULT_AGENT = "agent-beta"
 claude --dangerously-load-development-channels server:agentgate
 ```
 
-启动后：
-1. 第一个启动的 Claude 自举为注册中心（监听 :8444）
-2. 第二个启动的 Claude 连接到注册中心，获知第一个的地址
-3. 两者建立 P2P 直连
-4. 任一 Claude 中用 `send_message` 工具发消息，另一侧自动收到 `<channel>` 块
+After startup:
+1. The first Claude instance self-bootstraps as the registry (listening on :8444)
+2. The second Claude instance connects to the registry and discovers the first agent's address
+3. Both establish a P2P direct connection
+4. Use `send_message` tool in any Claude instance — the other side automatically receives a `<channel>` block
 
-### 三实例启动
+### Triple-Instance Start
 
 ```powershell
-# 终端 A
+# Terminal A
 $env:AGENTGATE_DEFAULT_AGENT = "agent-alpha"
-$env:AGENTGATE_BRIDGE_PORT = "18445"     # 可选：指定 Bridge 端口
+$env:AGENTGATE_BRIDGE_PORT = "18445"     # Optional: specify Bridge port
 claude --dangerously-load-development-channels server:agentgate
 
-# 终端 B
+# Terminal B
 $env:AGENTGATE_DEFAULT_AGENT = "agent-beta"
 $env:AGENTGATE_BRIDGE_PORT = "18446"
 claude --dangerously-load-development-channels server:agentgate
 
-# 终端 C
+# Terminal C
 $env:AGENTGATE_DEFAULT_AGENT = "agent-gamma"
 $env:AGENTGATE_BRIDGE_PORT = "18447"
 claude --dangerously-load-development-channels server:agentgate
 ```
 
-所有 Agent 通过注册中心发现彼此，建立 P2P 全连通网络。
+All agents discover each other through the registry and establish a fully-connected P2P network.
 
 ---
 
-## 1. 架构概览
+## 1. Architecture Overview
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                      Bridge 网络                                     │
+│                      Bridge Network                                  │
 │                                                                     │
-│  注册中心 (:8444)         agent-alpha (:18445)    agent-beta (:18446)│
+│  Registry (:8444)          agent-alpha (:18445)   agent-beta (:18446)│
 │  ┌────────────────┐      ┌──────────────┐       ┌──────────────┐   │
 │  │ RegistryServer │◄────►│ PeerManager   │◄────►│ PeerManager   │   │
 │  │                │      │              │       │              │   │
 │  │ peers:         │      │ Registry     │       │ Registry     │   │
 │  │  alpha:18445   │      │ Client       │       │ Client       │   │
 │  │  beta :18446   │      │              │       │              │   │
+│  │  gamma:18447   │      │ RetryQueue   │       │ RetryQueue   │   │
 │  └────────────────┘      └──────┬───────┘       └──────┬───────┘   │
 │                                 │                      │           │
-│                          直连 TCP (P2P) ◄─────────────►│           │
+│                           Direct TCP (P2P) ◄──────────►│           │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-### 角色
+### Roles
 
-| 角色 | 说明 | 数量 |
-|------|------|------|
-| **注册中心** (Registry) | 维护在线 agent 列表。第一个启动的 agent 自举成为注册中心 | 唯一，固定端口 8444 |
-| **普通 agent** | 向注册中心注册后，与其他 agent 直连通信 | 任意多个 |
+| Role | Description | Count |
+|------|-------------|-------|
+| **Registry** | Maintains the online agent list. The first agent to start self-bootstraps as the registry | 1 (fixed port 8444) |
+| **Normal Agent** | Registers with the registry, then communicates directly with peers | Any number |
 
 ---
 
-## 2. 端口分配
+## 2. Port Allocation
 
-### 注册中心端口
+### Registry Port
 
-**固定 8444**。第一个启动的 agent 在此端口启动 RegistryServer，成为注册中心。
+**Fixed at 8444**. The first agent to start launches a RegistryServer on this port and becomes the registry.
 
-### 普通 agent 端口
+### Normal Agent Ports
 
-**可配置，默认 OS 自动分配**。优先级：
+**Configurable, OS auto-assigned by default.** Priority:
 
 ```
-1. 环境变量 AGENTGATE_BRIDGE_PORT   → 指定端口
-2. 文件 ~/.agentgate/ports/<agent_id> → 持久化上次端口
-3. 操作系统自动分配 (port 0)         → 随机空闲端口
+1. Environment variable AGENTGATE_BRIDGE_PORT → specified port
+2. File ~/.agentgate/ports/<agent_id> → persisted last port
+3. OS auto-assignment (port 0) → random available port
 ```
 
-配置方式：
+Configuration methods:
 
 ```powershell
-# 方法 A：环境变量
+# Method A: Environment variable
 $env:AGENTGATE_BRIDGE_PORT = "18445"
 claude --dangerously-load-development-channels server:agentgate
 
-# 方法 B：持久化文件
+# Method B: Persisted file
 echo 18445 > ~\.agentgate\ports\agent-alpha
 
-# 方法 C：不设置，自动分配
+# Method C: Auto-assignment
 claude --dangerously-load-development-channels server:agentgate
 ```
 
 ---
 
-## 3. 协议消息格式
+## 3. Protocol Message Format
 
-所有消息为 **JSON Lines**（`\n` 分隔），基于 TCP。
+All messages are **JSON Lines** (`\n` delimited) over TCP.
 
-### 3.1 注册阶段
+### 3.1 Registration Phase
 
-#### REGISTER — agent 向注册中心注册
+#### REGISTER — Agent registers with the registry
 
 ```json
 {
@@ -166,7 +166,7 @@ claude --dangerously-load-development-channels server:agentgate
 }
 ```
 
-#### REGISTER_ACK — 注册中心的确认
+#### REGISTER_ACK — Registry confirmation
 
 ```json
 {
@@ -178,9 +178,9 @@ claude --dangerously-load-development-channels server:agentgate
 }
 ```
 
-`peers` 数组包含**除自身外**所有当前在线的 agent。收到后应立即建立直连。
+The `peers` array contains **all currently online agents except the requester**. Direct connections should be established immediately upon receipt.
 
-#### PEER_JOIN — 注册中心广播新 agent 上线
+#### PEER_JOIN — Registry broadcasts new agent arrival
 
 ```json
 {
@@ -191,9 +191,9 @@ claude --dangerously-load-development-channels server:agentgate
 }
 ```
 
-注册中心向**所有已在线的 agent** 广播此消息。收到后应主动连接新 peer。
+The registry broadcasts this to **all already-connected agents**. Recipients should connect to the new peer.
 
-#### PEER_LEAVE — agent 下线通知
+#### PEER_LEAVE — Agent offline notification
 
 ```json
 {
@@ -202,11 +202,11 @@ claude --dangerously-load-development-channels server:agentgate
 }
 ```
 
-发送时机：
-- agent 正常退出时主动发送
-- 注册中心检测到 TCP 断开时广播
+Sent when:
+- An agent exits normally and sends UNREGISTER
+- The registry detects TCP disconnection
 
-#### UNREGISTER — agent 主动下线
+#### UNREGISTER — Agent voluntarily goes offline
 
 ```json
 {
@@ -215,11 +215,11 @@ claude --dangerously-load-development-channels server:agentgate
 }
 ```
 
-发送后注册中心广播 PEER_LEAVE 并关闭连接。
+The registry broadcasts PEER_LEAVE and closes the connection.
 
-### 3.2 通信阶段
+### 3.2 Communication Phase
 
-#### MESSAGE — 跨 agent 消息
+#### MESSAGE — Cross-agent message
 
 ```json
 {
@@ -240,63 +240,116 @@ claude --dangerously-load-development-channels server:agentgate
 }
 ```
 
-**路由规则**（由 `sendToPeer()` 决定）：
+**Routing rules** (determined by `sendToPeer()`):
 
-| topic 匹配 | 行为 |
-|-----------|------|
-| `agent.{agent_id}.inbound` | 转发给 `agent_id` 对应的 peer |
-| `agent.{agent_id}.outbound` | 转发给 `agent_id` 对应的 peer |
-| `_system.*` | 转发给所有 peer |
-| `_system.conversation.*` | 转发给所有 peer |
+| topic match | Behavior |
+|-------------|----------|
+| `agent.{agent_id}.inbound` | Forward to the agent's peer |
+| `agent.{agent_id}.outbound` | Forward to the agent's peer |
+| `_system.*` | Forward to all peers |
+| `_system.conversation.*` | Forward to all peers |
 
-### 3.3 心跳
+### 3.3 Heartbeat
 
 ```json
 {"type": "heartbeat"}
 {"type": "heartbeat_ack"}
 ```
 
-心跳仅用于 **直连 peer 之间**，不经过注册中心。超时 60 秒无响应视为断开。
+Heartbeats only occur **between direct peers**, not through the registry. 60-second timeout without response triggers disconnection.
 
 ---
 
-## 4. 生命周期
+## 4. RetryQueue — P2P Message Retry
 
-### 4.1 启动流程
+When P2P delivery fails (peer offline, socket unwritable), messages enter the `RetryQueue` for automatic retry.
+
+### Design
+
+- **Per-agent bucketing**: messages are grouped by `target_agent_id`, independent per peer
+- **Exponential backoff**: 1s → 2s → 4s → 8s → ... → 60s max
+- **Max retries**: 8 attempts before dead-letter
+- **Drain on reconnect**: `drain(targetAgentId)` immediately flushes the queue when a peer reconnects
+- **Dead-letter callback**: `onDeadLetter` fires for exhausted retries
+
+### Retry Flow
 
 ```
-1. 读取配置（端口 / agent_id）
-2. 启动 BridgeServer（监听自己的端口）
-3. 连接注册中心 (:8444)
-4. 发送 REGISTER → 收到 REGISTER_ACK
-5. 根据 REGISTER_ACK.peers 建立直连
-6. 监听 PEER_JOIN → 连接新 peer
-7. 进入通信阶段
+P2P send fails → enqueue(envelope, targetAgentId, topic)
+  → tick() every 2s checks due messages
+    → socket.write() on reconnect
+      → success: removed from queue
+      → failure: attempt++ → rescheduled with backoff
+        → 8 attempts exhausted → dead-letter
 ```
 
-### 4.2 注册中心自举
+### Dead Letter Handling
 
-第一个启动的 agent 在 8444 启动 RegistryServer。后续 agent 连接 8444 时：
-
-- 如果连接成功 → 自己是普通 agent
-- 如果连接失败（端口被占用）→ 也作为普通 agent，不用自举
-- 如果连接失败且 8444 无人监听 → 自己当注册中心
-
-**特殊情况**：如果注册中心挂了，其他 agent 之间的已有直连**不受影响**，但新 agent 无法加入。恢复方式：重启任意一个 agent，它会尝试自举成为新注册中心。
-
-### 4.3 断开检测
-
-| 检测方式 | 对象 | 超时 |
-|---------|------|------|
-| TCP 断开事件 | 所有连接 | 即时 |
-| 心跳超时 | peer 直连 | 60s |
-| 注册中心检测 TCP 断开 | 普通 agent | 即时 |
+```typescript
+retryQueue.onDeadLetter = (envelope, agentId, reason) => {
+  console.error(`[RetryQueue] DEAD LETTER ${envelope.message_id} → ${agentId}: ${reason}`)
+}
+```
 
 ---
 
-## 5. 配置方式
+## 5. Advertise Host for Cross-Machine
 
-### 5.1 `~/.claude.json` 配置
+By default, agents register with `127.0.0.1` as their address. For cross-machine communication (e.g., via Tailscale), set `AGENTGATE_BRIDGE_HOST` to the machine's routable IP:
+
+```typescript
+export interface BridgeAgentOptions {
+  agentId: string
+  bus: MessageBus
+  listenPort?: number
+  registryHost?: string
+  registryPort?: number
+  /** Host address advertised to the registry. Set to Tailscale IP or public IP for cross-machine P2P */
+  advertiseHost?: string
+}
+```
+
+Default is `127.0.0.1` (backward-compatible, single-machine scenarios unaffected).
+
+---
+
+## 6. Lifecycle
+
+### 6.1 Startup Flow
+
+```
+1. Read config (port / agent_id)
+2. Start BridgeServer (listen on own port)
+3. Connect to registry (:8444)
+4. Send REGISTER → receive REGISTER_ACK
+5. Establish direct connections from REGISTER_ACK.peers
+6. Listen for PEER_JOIN → connect to new peers
+7. Enter communication phase
+```
+
+### 6.2 Registry Self-Bootstrap
+
+The first agent to start launches a RegistryServer on 8444. When subsequent agents connect to 8444:
+
+- If connection succeeds → normal agent
+- If connection fails (port in use) → normal agent, don't bootstrap
+- If connection fails (nothing listening on 8444) → self-bootstrap as registry
+
+**Edge case**: If the registry crashes, existing P2P connections **remain unaffected**, but new agents can't join. Recovery: restart any agent — it will attempt to self-bootstrap as the new registry.
+
+### 6.3 Disconnect Detection
+
+| Detection Method | Target | Timeout |
+|-----------------|--------|---------|
+| TCP disconnect event | All connections | Immediate |
+| Heartbeat timeout | Peer direct connections | 60s |
+| Registry detects TCP disconnect | Normal agents | Immediate |
+
+---
+
+## 7. Configuration
+
+### 7.1 `~/.claude.json` Configuration
 
 ```json
 {
@@ -312,61 +365,63 @@ claude --dangerously-load-development-channels server:agentgate
 }
 ```
 
-**关键：** `${AGENTGATE_DEFAULT_AGENT}` 是**环境变量占位符**。Claude 在解析 `~/.claude.json` 时，会将 `${变量名}` 替换为当前进程环境变量的值。这不是 `mcp_server.js` 的参数展开，而是 Claude 自身的配置解析行为——在 spawn 子进程之前就完成了替换。
+**Key point:** `${AGENTGATE_DEFAULT_AGENT}` is an **environment variable placeholder**. Claude resolves `${var}` syntax in `~/.claude.json` by substituting the current process environment variable value — **before** spawning the MCP subprocess.
 
-所以两个 Claude 实例可以共用同一份 `~/.claude.json`，只需在启动前设不同的环境变量即可区分身份。
-```
+This means two Claude instances can share the same `~/.claude.json`. They differentiate by setting different environment variable values before startup.
 
-### 5.2 环境变量
+### 7.2 Environment Variables
 
-| 变量 | 默认值 | 说明 |
-|------|--------|------|
-| `AGENTGATE_DEFAULT_AGENT` | `default` | 当前 agent 的身份 ID |
-| `AGENTGATE_BRIDGE_PORT` | `0`（自动） | 当前 agent 的 Bridge 监听端口 |
-| `AGENTGATE_BRIDGE_HOST` | `127.0.0.1` | 绑定的 host（本地开发用 localhost） |
-| `AGENTGATE_REGISTRY_PORT` | `8444` | 注册中心端口 |
-| `AGENTGATE_REGISTRY_HOST` | `127.0.0.1` | 注册中心地址 |
-| `AGENTGATE_DIR` | `~/.agentgate` | 数据目录 |
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `AGENTGATE_DEFAULT_AGENT` | `default` | Current agent's identity ID |
+| `AGENTGATE_BRIDGE_PORT` | `0` (auto) | Bridge listen port for this agent |
+| `AGENTGATE_BRIDGE_HOST` | `127.0.0.1` | Advertised host address (for cross-machine P2P) |
+| `AGENTGATE_REGISTRY_PORT` | `8444` | Registry port |
+| `AGENTGATE_REGISTRY_HOST` | `127.0.0.1` | Registry address |
+| `AGENTGATE_DIR` | `~/.agentgate` | Data directory |
 
-### 5.3 启动示例
+### 7.3 Startup Examples
 
 ```powershell
-# 终端 A — 自举为注册中心
+# Terminal A — self-bootstrap as registry
 $env:AGENTGATE_DEFAULT_AGENT = "agent-alpha"
 $env:AGENTGATE_BRIDGE_PORT = "18445"
 claude --dangerously-load-development-channels server:agentgate
 
-# 终端 B — 普通 agent
+# Terminal B — normal agent
 $env:AGENTGATE_DEFAULT_AGENT = "agent-beta"
 $env:AGENTGATE_BRIDGE_PORT = "18446"
 claude --dangerously-load-development-channels server:agentgate
 
-# 终端 C — 自动分配端口
+# Terminal C — auto-assigned port
 $env:AGENTGATE_DEFAULT_AGENT = "agent-gamma"
 claude --dangerously-load-development-channels server:agentgate
 ```
 
 ---
 
-## 6. 与 v1 的差异
+## 8. Comparison with v1
 
-| 方面 | v1（当前） | v2（新设计） |
-|------|-----------|------------|
-| 端口 | 固定 8444（所有 agent） | 每 agent 独立端口 |
-| 注册中心 | 隐式自举 | 显式 REGISTER 协议 |
-| 消息路由 | hub 中转 | P2P 直连 |
-| 断开检测 | TCP 断开 | TCP 断开 + 心跳 |
-| 配置 | 环境变量 | 环境变量 + 文件持久化 |
-| 文档 | 无 | 本文档 |
+| Aspect | v1 (legacy) | v2 (current) |
+|--------|-------------|--------------|
+| Port | Fixed 8444 (all agents) | Per-agent independent port |
+| Registry | Implicit self-bootstrap | Explicit REGISTER protocol |
+| Message routing | Hub relay | P2P direct connection |
+| Disconnect detection | TCP disconnect only | TCP disconnect + heartbeat |
+| Configuration | Environment variables | Environment variables + file persistence |
+| Retry on failure | None | RetryQueue with exponential backoff |
+| Cross-machine | Not supported | advertiseHost + RetryQueue |
+| Documentation | None | This document |
 
 ---
 
-## 7. 实现清单
+## 9. Implementation Checklist
 
-- [ ] `RegistryServer` — 监听 8444，处理 REGISTER/UNREGISTER，广播 PEER_JOIN/PEER_LEAVE
-- [ ] `RegistryClient` — 向注册中心注册，维护 peer 列表
-- [ ] `PeerConnection` — 直连 TCP 管理，心跳，断线重连
-- [ ] `PeerManager` — 管理所有 peer 连接，根据 topic 路由消息
-- [ ] 端口分配策略 — 环境变量 > 文件 > 自动
-- [ ] 自举逻辑 — 先尝试连接 8444，失败则自举
-- [ ] 旧 BridgeServer/BridgeClient 移除
+- [x] `RegistryServer` — listen on 8444, handle REGISTER/UNREGISTER, broadcast PEER_JOIN/PEER_LEAVE
+- [x] `RegistryClient` — register with registry, maintain peer list
+- [x] `PeerConnection` — direct TCP management, heartbeat, reconnection
+- [x] `PeerManager` — manage all peer connections, route messages by topic
+- [x] Port allocation strategy — environment variable > file > auto
+- [x] Bootstrap logic — try connect 8444, fall back to self-bootstrap
+- [x] Legacy BridgeServer/BridgeClient removal
+- [x] `RetryQueue` — exponential backoff, drain on reconnect, dead-letter

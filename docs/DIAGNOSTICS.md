@@ -1,97 +1,97 @@
-# AgentGate 分层诊断手册
+# AgentGate Layered Diagnostic Manual
 
-> 从浅到深逐层排查，每一层通过后再进入下一层。
-> 适合"插件不工作"、"收不到消息"、"Bridge 连不上"等场景。
+> Systematic layer-by-layer troubleshooting, from shallow to deep.
+> Designed for "plugin doesn't work", "can't receive messages", "Bridge won't connect" scenarios.
 
 ---
 
-## 层级概览
+## Layer Overview
 
 ```
-Layer 0 — 环境就绪
-Layer 1 — 单实例启动
-Layer 2 — 双实例注册
-Layer 3 — Bridge P2P 连通
-Layer 4 — 消息投递
+Layer 0 — Environment Readiness
+Layer 1 — Single Instance Startup
+Layer 2 — Dual Instance Registration
+Layer 3 — Bridge P2P Connectivity
+Layer 4 — Message Delivery
 Layer 5 — MCP Notification
 ```
 
-每一层都有**诊断命令**和**预期输出**，对照即可定位问题。
+Each layer has **diagnostic commands** and **expected output** to quickly pinpoint issues.
 
 ---
 
-## Layer 0 — 环境就绪
+## Layer 0 — Environment Readiness
 
-### 0.1 构建
+### 0.1 Build
 
 ```bash
 npm run build
-# 等价于: npx tsc
+# Equivalent to: npx tsc
 ```
 
-预期输出：无报错，exit code 0。
+Expected output: No errors, exit code 0.
 
-验证产物：
+Verify build artifacts:
 
 ```bash
 dir dist\mcp_server.js
 ```
 
-预期：文件存在，大小 ~12KB。
+Expected: File exists, size ~12KB.
 
-### 0.2 清理残留进程
+### 0.2 Clean Up Residual Processes
 
-旧 session 残留的 node 进程可能仍占用注册中心端口 `:8444`，导致新实例连接的是老旧注册中心。
+Old session node processes may still occupy the registry port `:8444`, causing new instances to connect to a stale registry.
 
-**检查端口占用：**
+**Check port usage:**
 
 ```bash
 netstat -ano | findstr ":8444 "
 ```
 
-预期输出列说明：
+Expected output explanation:
 
-| 状态 | 含义 |
-|------|------|
-| `LISTENING` | 有进程在监听 8444（可能是本 session 也可能是残留） |
-| `ESTABLISHED` | 有客户端连接到此端口 |
-| `TIME_WAIT` | 刚断开的连接，无害 |
-| (无输出) | 端口空闲 — 首个实例会自举为注册中心 |
+| State | Meaning |
+|-------|---------|
+| `LISTENING` | A process is listening on 8444 (could be current session or residual) |
+| `ESTABLISHED` | A client is connected to this port |
+| `TIME_WAIT` | Recently disconnected, harmless |
+| (no output) | Port free — first instance will self-bootstrap as registry |
 
-**判断是否为残留进程：**
+**Check if it's a residual process:**
 
-1. 记下 `LISTENING` 行的 PID
-2. 与当前 session 启动的进程对比（已知 PID 来自 `run_background` 返回值）
-3. 若不匹配则为残留
+1. Note the `LISTENING` line's PID
+2. Compare with the current session's process PIDs
+3. If not matching, it's residual
 
-**清理残留：**
+**Clean up residuals:**
 
 ```powershell
-# 杀死已知残留 PID
+# Kill known residual PIDs
 taskkill /F /PID <PID1> /PID <PID2>
 ```
 
-### 0.3 清理 agent_id 缓存
+### 0.3 Clean agent_id Cache
 
-`~/.agentgate/agent_id` 文件会覆盖 `--agent-id` CLI 参数以外的所有 ID 设置。
+The `~/.agentgate/agent_id` file overrides all ID settings except the `--agent-id` CLI parameter.
 
 ```bash
 type "%USERPROFILE%\.agentgate\agent_id"
 ```
 
-如果内容不是预期的，删除它：
+If the content doesn't match, delete it:
 
 ```bash
 del /F "%USERPROFILE%\.agentgate\agent_id"
 ```
 
-### 0.4 检查 .mcp.json
+### 0.4 Check .mcp.json
 
 ```bash
 type .mcp.json
 ```
 
-预期：
+Expected:
 
 ```json
 {
@@ -108,17 +108,17 @@ type .mcp.json
 
 ---
 
-## Layer 1 — 单实例启动
+## Layer 1 — Single Instance Startup
 
-验证 MCP Server 能正常加载并启动。
+Verify the MCP Server loads and starts correctly.
 
-### 1.1 快速加载测试
+### 1.1 Quick Load Test
 
 ```bash
 node -e "import('./dist/mcp_server.js').then(()=>console.log('MODULE_LOAD_OK')).catch(e=>console.log('LOAD_FAIL:',e.message))"
 ```
 
-预期输出：
+Expected output:
 
 ```
 [AgentRegistry] Registered: agent-alpha (Default Agent)
@@ -131,57 +131,57 @@ node -e "import('./dist/mcp_server.js').then(()=>console.log('MODULE_LOAD_OK')).
 MODULE_LOAD_OK
 ```
 
-**关键检查点：**
+**Key checkpoints:**
 
-| 输出片段 | 含义 |
-|----------|------|
-| `Registered: <name>` | Agent 注册成功 |
-| `Self-bootstrapped as registry` | 首个实例，自举为注册中心 |
-| `Connected to registry` | 后续实例，连接到已有注册中心 |
-| `[AgentGate MCP] Running` | MCP Server 就绪，等待 stdin |
+| Output Fragment | Meaning |
+|-----------------|---------|
+| `Registered: <name>` | Agent registered successfully |
+| `Self-bootstrapped as registry` | First instance, self-bootstrapped as registry |
+| `Connected to registry` | Subsequent instance, connected to existing registry |
+| `[AgentGate MCP] Running` | MCP Server ready, waiting for stdin |
 
-### 1.2 前台启动（调试用）
+### 1.2 Foreground Startup (Debugging)
 
 ```bash
 node dist/mcp_server.js --agent-id agent-alpha
 ```
 
-按 `Ctrl+C` 退出。stderr 输出与 1.1 相同。
+Press `Ctrl+C` to exit. stderr output matches section 1.1.
 
 ---
 
-## Layer 2 — 双实例注册
+## Layer 2 — Dual Instance Registration
 
-验证两个 Agent 能注册到同一注册中心。
+Verify two agents can register with the same registry.
 
-### 2.1 启动 agent-alpha（注册中心）
+### 2.1 Start agent-alpha (Registry)
 
 ```bash
-# 终端 / 后台
+# Terminal / background
 node dist/mcp_server.js --agent-id agent-alpha
 ```
 
-预期输出包含：
+Expected output includes:
 
 ```
 [Bridge] Self-bootstrapped as registry on :8444
 ```
 
-### 2.2 启动 agent-beta（客户端）
+### 2.2 Start agent-beta (Client)
 
 ```bash
 node dist/mcp_server.js --agent-id agent-beta
 ```
 
-预期输出包含：
+Expected output includes:
 
 ```
 [Bridge] Connected to registry at 127.0.0.1:8444
 ```
 
-### 2.3 验证注册中心列表
+### 2.3 Verify Registry Peer List
 
-用测试探测脚本查询当前注册的 peers：
+Query the current registered peers with a probe script:
 
 ```bash
 node -e "
@@ -202,7 +202,7 @@ s.on('error',e=>{console.log('ERR:',e.message);process.exit(1)});
 "
 ```
 
-预期输出：
+Expected output:
 
 ```
 PEER: {"type":"register_ack","agent_id":"probe","peers":[
@@ -211,22 +211,22 @@ PEER: {"type":"register_ack","agent_id":"probe","peers":[
 ]}
 ```
 
-**两个 peer 都必须出现。** 若只有一个：
+**Both peers must appear.** If only one:
 
-- 检查 Layer 0 — 可能另一个进程连接到了残留注册中心
-- 检查 Layer 1 — 另一个实例是否启动失败
+- Check Layer 0 — the other process may have connected to a stale registry
+- Check Layer 1 — the other instance may have failed to start
 
 ---
 
-## Layer 3 — Bridge P2P 连通
+## Layer 3 — Bridge P2P Connectivity
 
-验证 agent 间能直连通信。
+Verify direct agent-to-agent communication.
 
-### 3.1 注册中心确认
+### 3.1 Registry Confirmation
 
-Layer 2 的 peer 列表已包含双方 — 进入下一步。
+Layer 2's peer list includes both agents — proceed to the next step.
 
-### 3.2 发送测试消息
+### 3.2 Send Test Message
 
 ```bash
 node -e "
@@ -237,12 +237,10 @@ s.on('data',d=>buf.push(d.toString()));
 s.connect(8444,'127.0.0.1',()=>{
   s.write(JSON.stringify({type:'register',agent_id:'test-harness',host:'127.0.0.1',port:0,ts:new Date().toISOString()})+'\n');
   setTimeout(()=>{
-    // 解析 peer 列表
     const lines=buf.join('').split('\n').filter(Boolean);
     const ack=JSON.parse(lines[0]);
     const beta=ack.peers.find(p=>p.agent_id==='agent-beta');
     if(!beta){console.log('FAIL: agent-beta not in registry');s.destroy();process.exit(1);}
-    // 连接到 beta 的 P2P 端口
     const p=new n.Socket();
     p.connect(beta.port,beta.host,()=>{
       p.write(JSON.stringify({type:'message',topic:'agent.agent-beta.inbound',
@@ -263,75 +261,71 @@ s.on('error',e=>{console.log('FAIL:',e.message);process.exit(1)});
 "
 ```
 
-预期输出：
+Expected output:
 
 ```
 OK: message sent to agent-beta
 ```
 
-### 3.3 验证接收方
+### 3.3 Verify Receiver
 
-检查 agent-beta 的 stderr 输出（来自 `run_background` 的 `job_output`）：
+Check agent-beta's stderr output:
 
-```bash
-# 用 job_output 工具查看 agent-beta 的输出
-```
-
-预期输出中应包含：
+Expected output should contain:
 
 ```
 [AgentRuntime] No route for: test_<id>
 ```
 
-和
+and
 
 ```json
 {"method":"notifications/claude/channel","params":{...}}
 ```
 
-**关键检查点：**
+**Key checkpoints:**
 
-| 输出 | 含义 |
-|------|------|
-| `[AgentRuntime] No route for` | ✅ 消息到达本地 bus，但无对应 channel handler（测试消息正常） |
-| `notifications/claude/channel` | ✅ MCP Server 生成了 channel 通知 |
-| 两者都无 | ❌ 消息未到达 — Bridge 路由可能有问题 |
+| Output | Meaning |
+|--------|---------|
+| `[AgentRuntime] No route for` | ✅ Message reached local bus, no channel handler (expected for test messages) |
+| `notifications/claude/channel` | ✅ MCP Server generated channel notification |
+| Neither present | ❌ Message didn't arrive — Bridge routing may be broken |
 
 ---
 
-## Layer 4 — 消息投递（端到端）
+## Layer 4 — End-to-End Message Delivery
 
-验证 MCP 工具的完整调用链路。
+Verify the complete MCP tool invocation chain.
 
-### 4.1 前置条件
+### 4.1 Prerequisites
 
-Layer 1-3 全部通过。两个 MCP Server 实例运行中。
+Layers 1-3 all pass. Both MCP Server instances are running.
 
-### 4.2 模拟 MCP 调用
+### 4.2 Simulate MCP Call
 
-MCP Server 通过 `stdin` 接收 JSON-RPC，通过 `stdout` 返回响应。
-以下模拟 `list_conversations` 调用：
+MCP Server receives JSON-RPC via `stdin` and returns responses via `stdout`.
+Simulate `list_conversations` call:
 
 ```bash
 echo '{"jsonrpc":"2.0","id":"1","method":"tools/call","params":{"name":"list_conversations","arguments":{}}}' | node dist/mcp_server.js --agent-id agent-alpha 2>/dev/null
 ```
 
-预期输出（stdout）：
+Expected output (stdout):
 
 ```json
 {"jsonrpc":"2.0","id":"1","result":{"content":[{"type":"text","text":"(no conversations)"}]}}
 ```
 
-### 4.3 跨实例 send_message 测试
+### 4.3 Cross-Instance send_message Test
 
-这是最完整的端到端测试，需要两个实例运行中。
+This is the most complete end-to-end test, requiring both instances running.
 
-**测试方案：** 利用 `agent-beta` 的 `pendingMessages` 机制 — 任何发往 `agent.agent-beta.inbound` 的消息会进入 pending 队列，下次工具调用时返回。
+**Test approach:** Leverage agent-beta's `pendingMessages` mechanism — any message sent to `agent.agent-beta.inbound` enters the pending queue and is returned on the next tool call.
 
-执行测试（目标：从外部向 agent-beta 发消息，验证其 MCP 工具能读出）：
+Execute test (send a message to agent-beta from outside, verify MCP tools can read it):
 
 ```bash
-# 1. 通过 Bridge 向 agent-beta 发消息
+# 1. Send message to agent-beta via Bridge
 node -e "
 const n=require('net');
 const s=new n.Socket();
@@ -361,22 +355,22 @@ s.connect(8444,'127.0.0.1',()=>{
 });
 " 2>&1
 
-# 2. 检查 agent-beta 的 job_output 确认收到
-# 3. 验证 conversation store 有记录
+# 2. Check agent-beta's job_output to confirm receipt
+# 3. Verify conversation store has the record
 ```
 
 ---
 
 ## Layer 5 — MCP Notification
 
-验证 `notifications/claude/channel` 能否被 Claude 消费。
+Verify whether `notifications/claude/channel` can be consumed by Claude.
 
-> ⚠️ 本层需要 Claude Code 桌面端参与，无法在 headless 模式完全验证。
-> 但 MCP Server 的 stderr 会打印通知 JSON，可提前确认格式正确。
+> ⚠️ This layer requires Claude Code desktop interaction and cannot be fully verified in headless mode.
+> However, MCP Server stderr prints the notification JSON, confirming correct formatting.
 
-### 5.1 检查通知格式
+### 5.1 Check Notification Format
 
-agent-beta 收到消息后，其 stderr 应输出：
+After agent-beta receives a message, its stderr should output:
 
 ```json
 {
@@ -397,114 +391,114 @@ agent-beta 收到消息后，其 stderr 应输出：
 }
 ```
 
-### 5.2 已知问题
+### 5.2 Known Issues
 
-| 现象 | 原因 |
-|------|------|
-| Notification 已发出但 Claude 不显示 `<channel>` | 可能仅限于 marketplace 安装的插件。`--dangerously-load-development-channels` 可绕过此限制 |
-| Claude 回复 "没有 agentgate 工具" | `.mcp.json` 路径不正确，或 MCP Server 启动报错 |
-
----
-
-## 常见问题速查表
-
-| 症状 | 可能原因 | 排查层 |
-|------|---------|--------|
-| MCP Server 启动无输出 | tsc 未构建 / 缺少依赖 | Layer 0 |
-| "Self-bootstrapped as registry" 不出现 | 端口 8444 被残留进程占用 | Layer 0.2 |
-| Agent ID 一直是 "default" | `~/.agentgate/agent_id` 文件影响 | Layer 0.3 |
-| 注册中心只有 1 个 peer | 第二个实例未连接 / 连接到了残留注册中心 | Layer 2 |
-| 消息发送成功但对方无响应 | MCP Server 的 `pendingMessages` 队列需下次工具调用才返回 | Layer 4 |
-| Bridge 连接建立后立即断开 | 心跳超时 (60s) — 检查网络延迟 | Layer 3 |
-| notification 已发但 Claude 不显示 | 版本限制 — 尝试 `--dangerously-load-development-channels` | Layer 5 |
+| Symptom | Cause |
+|---------|-------|
+| Notification sent but Claude doesn't display `<channel>` | May be limited to marketplace-installed plugins. `--dangerously-load-development-channels` may bypass |
+| Claude responds "no agentgate tools" | `.mcp.json` path incorrect, or MCP Server startup error |
 
 ---
 
-## 分层排查流程
+## Common Issues Quick Reference
+
+| Symptom | Possible Cause | Check Layer |
+|---------|---------------|-------------|
+| MCP Server starts silently | tsc not built / missing dependencies | Layer 0 |
+| "Self-bootstrapped as registry" doesn't appear | Port 8444 occupied by residual process | Layer 0.2 |
+| Agent ID always "default" | `~/.agentgate/agent_id` file interference | Layer 0.3 |
+| Registry only has 1 peer | Second instance not connected / connected to stale registry | Layer 2 |
+| Message sent successfully but no response | `pendingMessages` queue requires next tool call to flush | Layer 4 |
+| Bridge connects then immediately disconnects | Heartbeat timeout (60s) — check network latency | Layer 3 |
+| Notification sent but Claude doesn't display | Version restriction — try `--dangerously-load-development-channels` | Layer 5 |
+
+---
+
+## Layered Troubleshooting Flow
 
 ```
 ┌──────────────────────────────┐
-│ Layer 0: 环境就绪            │  ← 从这里开始
-│  npm run build 成功           │
-│  netstat :8444 无残留         │
-│  agent_id 文件预期            │
+│ Layer 0: Environment Ready   │  ← Start here
+│  npm run build succeeds       │
+│  netstat :8444 no residuals   │
+│  agent_id file is correct     │
 └──────────┬───────────────────┘
            ▼
 ┌──────────────────────────────┐
-│ Layer 1: 单实例启动           │
-│  node -e import 无报错        │
+│ Layer 1: Single Instance     │
+│  node -e import no errors    │
 │  [AgentGate MCP] Running     │
 └──────────┬───────────────────┘
            ▼
 ┌──────────────────────────────┐
-│ Layer 2: 双实例注册           │
+│ Layer 2: Dual Registration   │
 │  alpha: Self-bootstrapped    │
 │  beta: Connected to registry │
-│  probe 看到 2 peers           │
+│  probe sees 2 peers          │
 └──────────┬───────────────────┘
            ▼
 ┌──────────────────────────────┐
-│ Layer 3: Bridge P2P 连通     │
-│  发送方: OK message sent     │
-│  接收方: channel notification│
+│ Layer 3: Bridge P2P Connect  │
+│  Sender: OK message sent     │
+│  Receiver: channel notificat.│
 └──────────┬───────────────────┘
            ▼
 ┌──────────────────────────────┐
-│ Layer 4: 端到端投递           │
-│  MCP tools/call 正常         │
-│  conversation store 有记录   │
+│ Layer 4: End-to-End Delivery │
+│  MCP tools/call works        │
+│  conversation store has rec. │
 └──────────┬───────────────────┘
            ▼
 ┌──────────────────────────────┐
-│ Layer 5: Claude 显示         │  需要 GUI 环境
-│  <channel> 块出现             │
+│ Layer 5: Claude Display      │  Requires GUI
+│  <channel> block appears      │
 └──────────────────────────────┘
 ```
 
-每层通过后再进入下一层。如果某一层失败，无需继续上层排查。
+Proceed to the next layer only after passing the current one. If a layer fails, don't continue to higher layers.
 
 ---
 
-## 诊断命令速记
+## Diagnostic Command Cheat Sheet
 
-| 目的 | 命令 |
-|------|------|
-| 构建 | `npm run build` |
-| 检查端口 | `netstat -ano \| findstr ":8444 "` |
-| 杀残留 | `taskkill /F /PID <PID>` |
-| 启动 alpha | `node dist/mcp_server.js --agent-id agent-alpha` |
-| 启动 beta | `node dist/mcp_server.js --agent-id agent-beta` |
-| 查 peer 列表 | 见 Layer 2.3 的 probe 脚本 |
-| 发测试消息 | 见 Layer 3.2 的脚本 |
-| 模拟 MCP 调用 | `echo '{"jsonrpc":"2.0","id":"1","method":"tools/call","params":{"name":"list_conversations","arguments":{}}}' \| node dist/mcp_server.js --agent-id agent-alpha 2>/dev/null` |
+| Purpose | Command |
+|---------|---------|
+| Build | `npm run build` |
+| Check port | `netstat -ano \| findstr ":8444 "` |
+| Kill residual | `taskkill /F /PID <PID>` |
+| Start alpha | `node dist/mcp_server.js --agent-id agent-alpha` |
+| Start beta | `node dist/mcp_server.js --agent-id agent-beta` |
+| Query peer list | See Layer 2.3 probe script |
+| Send test message | See Layer 3.2 script |
+| Simulate MCP call | `echo '{"jsonrpc":"2.0","id":"1","method":"tools/call","params":{"name":"list_conversations","arguments":{}}}' \| node dist/mcp_server.js --agent-id agent-alpha 2>/dev/null` |
 
 ---
 
-## 常见修复记录
+## Common Fix Records
 
-### Fix 1: `reply` 跨实例路由失效
+### Fix 1: `reply` Cross-Instance Routing Failure
 
-**症状：** `send_message` 成功，`<channel>` 块出现，但 `reply` 后对端收不到。MCP Server 的 stderr 能看到 `[AgentRuntime] No route for: <msg_id>`。
+**Symptom:** `send_message` succeeds, `<channel>` block appears, but `reply` doesn't reach the other side. MCP Server stderr shows `[AgentRuntime] No route for: <msg_id>`.
 
-**根因：** `src/mcp_server.ts` 的 `reply` handler 中：
-1. `agent_id` 默认回落到当前 agent（self），Bridge 的 `routeToPeer` 检测到 target=self 时跳过
-2. 消息被发布到 `agent.*.outbound`，Bridge 不转发 target=self 的 outbound 消息
+**Root cause:** In `src/mcp_server.ts`'s `reply` handler:
+1. `agent_id` defaulted to the current agent (self), causing `routeToPeer` to skip when target=self
+2. Messages published to `agent.*.outbound`, Bridge doesn't forward outbound messages for target=self
 
-**修复（2026-06-03）：**
+**Fix (2026-06-03):**
 ```typescript
-// 旧: 默认回落到自身 → Bridge 跳过
+// Old: defaulted to self → Bridge skipped
 agent_id: targetAgent ?? config.server.defaultAgent
 
-// 新: 从原消息推断发送者
+// New: infer sender from original message
 const senderId = original?.channel_user_id || original?.agent_id
 const replyTarget = (args.target_agent_id as string | undefined) || senderId
 agent_id: replyTarget ?? config.server.defaultAgent
 
-// 旧: outbound → Bridge 不转发
+// Old: outbound → Bridge doesn't forward
 bus.publish(`agent.${response.agent_id}.outbound`, response)
 
-// 新: inbound → Bridge 路由到目标 peer
+// New: inbound → Bridge routes to target peer
 bus.publish(`agent.${replyTarget}.inbound`, response)
 ```
 
-**验证：** 启动 alpha + beta 实例，从外部通过 Bridge TCP 发送消息模拟跨实例通信，检查对端是否出现 `notifications/claude/channel`。
+**Verification:** Start alpha + beta instances, send a cross-instance message via Bridge TCP, check for `notifications/claude/channel` on the receiving side.

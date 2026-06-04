@@ -1,31 +1,31 @@
-# AgentGate SSH Mesh 组网
+# AgentGate SSH Mesh Networking
 
-> 利用 SSH 隧道连接分布在不同机器上的 AgentGate Bridge Agent。
-> 适用于跨主机的 agent 协作场景。
-
----
-
-## 1. 背景
-
-当前 Bridge v2 的注册发现和 P2P 直连仅在 **单机 localhost** 范围内工作。当 agent 运行在不同主机上时：
-
-- 注册中心 8444 端口无法跨主机访问（除非暴露端口）
-- P2P 直连 TCP 也被防火墙/NAT 阻挡
-- 需要一种安全的跨主机隧道方案
-
-SSH 是解决这个问题的自然选择：
-- 几乎所有服务器都运行 SSH 服务
-- SSH 端口转发（Port Forwarding）可以安全地暴露内部端口
-- SSH 连接自带加密和认证
+> Using SSH tunnels to connect AgentGate Bridge Agents running on different machines.
+> Suitable for cross-host agent collaboration scenarios.
 
 ---
 
-## 2. 思路
+## 1. Background
 
-**SSH 隧道把远程端口映射到本地，让跨机器的 agent 看起来像跑在同一台机器上。**
+The Bridge v2 registry discovery and P2P direct connections only work within **single-machine localhost** by default. When agents run on different hosts:
+
+- Registry port 8444 is inaccessible across hosts (unless the port is exposed)
+- P2P direct TCP connections are blocked by firewalls/NAT
+- A secure cross-host tunnel solution is needed
+
+SSH is the natural choice:
+- Almost all servers run SSH services
+- SSH port forwarding can securely expose internal ports
+- SSH connections provide built-in encryption and authentication
+
+---
+
+## 2. Concept
+
+**SSH tunnels map remote ports to local ports, making cross-machine agents appear as if they're running on the same machine.**
 
 ```
-你的机器                          目标机器 (target-machine)
+Your Machine                      Target Machine (target-machine)
 ┌──────────────────┐           ┌──────────────────────────┐
 │ SSH -L 18445     │           │ agent-alpha :18445       │
 │ SSH -L 18446     │── SSH ──►│ agent-beta  :18446       │
@@ -35,7 +35,7 @@ SSH 是解决这个问题的自然选择：
 └──────────────────┘           └──────────────────────────┘
 ```
 
-映射后在你的机器上看：
+After mapping, from your machine's perspective:
 ```
 localhost:18445  =  target-machine:18445 (agent-alpha)
 localhost:18446  =  target-machine:18446 (agent-beta)
@@ -43,16 +43,16 @@ localhost:18447  =  target-machine:18447 (agent-gamma)
 localhost:8444   =  target-machine:8444  (RegistryServer)
 ```
 
-你的 BridgeAgent 配置 `registryHost: "127.0.0.1"`，所有 agent 像本地一样通信。
+Your BridgeAgent configures `registryHost: "127.0.0.1"`, and all agents communicate as if local.
 
 ---
 
-## 3. 手动建立 SSH 隧道
+## 3. Manual SSH Tunnel Setup
 
-### 3.1 场景一：目标机运行所有 agent + 注册中心
+### 3.1 Scenario 1: Target Machine Runs All Agents + Registry
 
 ```bash
-# 一条 SSH 命令，把目标机的全部端口拉到本地
+# Single SSH command, pull all ports from target machine to local
 ssh -L 8444:localhost:8444 \
      -L 18445:localhost:18445 \
      -L 18446:localhost:18446 \
@@ -60,7 +60,7 @@ ssh -L 8444:localhost:8444 \
      user@target-machine -N
 ```
 
-如果 SSH 端口不是 22：
+If SSH port isn't 22:
 
 ```bash
 ssh -L 8444:localhost:8444 \
@@ -70,12 +70,12 @@ ssh -L 8444:localhost:8444 \
      -p 2222 user@target-machine -N
 ```
 
-`-N` 表示不执行远程命令，只做端口转发。
+`-N` means no remote command execution, port forwarding only.
 
-### 3.2 场景二：你的机器也要加入组网
+### 3.2 Scenario 2: Your Machine Also Joins the Mesh
 
 ```bash
-# 既拉取远程端口，也把你本地的 Bridge 端口暴露到目标机
+# Pull remote ports and expose your local Bridge port to the target machine
 ssh -L 8444:localhost:8444 \
      -L 18445:localhost:18445 \
      -L 18446:localhost:18446 \
@@ -83,69 +83,69 @@ ssh -L 8444:localhost:8444 \
      user@target-machine -N
 ```
 
-`-R 18448:localhost:18448` 表示：目标机上的 18448 转发到你的 18448。
+`-R 18448:localhost:18448` means: port 18448 on the target machine forwards to your local 18448.
 
-### 3.3 场景三：目标机只有 SSH 端口开放
+### 3.3 Scenario 3: Target Machine Only Has SSH Port Open
 
-即使目标机防火墙只开了 22 端口，SSH 隧道可以穿透所有需要的端口：
+Even if the target machine's firewall only opens port 22, SSH tunnels can penetrate all needed ports:
 
 ```bash
 ssh -L 8444:localhost:8444 -L 18445:localhost:18445 user@target-machine -N
 ```
 
-SSH 在应用层建立隧道，不受目标机防火墙规则限制（只要 SSH 能连上）。
+SSH establishes tunnels at the application layer, unaffected by target machine firewall rules (as long as SSH can connect).
 
 ---
 
-## 4. 完整启动流程
+## 4. Complete Startup Flow
 
-### 4.1 启动注册中心（在目标机上）
+### 4.1 Start Registry (on Target Machine)
 
 ```bash
-# 目标机终端
+# Target machine terminal
 node dist/index.js bridge 8444
 ```
 
-### 4.2 启动 agent-alpha（在目标机上）
+### 4.2 Start agent-alpha (on Target Machine)
 
 ```bash
-# 目标机终端
+# Target machine terminal
 $env:AGENTGATE_DEFAULT_AGENT = "agent-alpha"
 $env:AGENTGATE_BRIDGE_PORT = "18445"
 node dist/index.js start
 ```
 
-### 4.3 启动 agent-beta（在目标机上）
+### 4.3 Start agent-beta (on Target Machine)
 
 ```bash
-# 目标机另一个终端
+# Another target machine terminal
 $env:AGENTGATE_DEFAULT_AGENT = "agent-beta"
 $env:AGENTGATE_BRIDGE_PORT = "18446"
 node dist/index.js start
 ```
 
-### 4.4 建立 SSH 隧道（在你的机器上）
+### 4.4 Establish SSH Tunnel (on Your Machine)
 
 ```bash
-# 你的机器终端 — 一条 SSH 拉取所有端口
+# Your machine terminal — single SSH pulls all ports
 ssh -L 8444:localhost:8444 -L 18445:localhost:18445 -L 18446:localhost:18446 user@target-machine -N
 ```
 
-保持此终端运行，不要关闭。
+Keep this terminal running — don't close it.
 
-### 4.5 启动你的本地 agent
+### 4.5 Start Your Local Agent
 
 ```bash
-# 你的机器另一个终端
+# Your machine, another terminal
 $env:AGENTGATE_DEFAULT_AGENT = "agent-delta"
 $env:AGENTGATE_BRIDGE_PORT = "18448"
-$env:AGENTGATE_REGISTRY_HOST = "127.0.0.1"    # ← 通过 SSH 隧道访问目标机注册中心
+$env:AGENTGATE_REGISTRY_HOST = "127.0.0.1"    # ← Accessing target machine's registry via SSH tunnel
 node dist/index.js start
 ```
 
-### 4.6 验证
+### 4.6 Verification
 
-查看 agent-delta 的启动日志，应看到：
+Check agent-delta's startup log — should see:
 
 ```
 [Bridge] Connected to registry at 127.0.0.1:8444
@@ -154,33 +154,33 @@ node dist/index.js start
 [Bridge] Peer joined: agent-beta (127.0.0.1:18446)
 ```
 
-四个 agent 都在同一个 Registry 下，P2P 直连通过 SSH 隧道中转。
+All four agents are under the same Registry, with P2P direct connections routed through the SSH tunnel.
 
 ---
 
-## 5. 隧道类型参考
+## 5. Tunnel Type Reference
 
-| SSH 参数 | 方向 | 说明 |
-|----------|------|------|
-| `-L 18445:localhost:18445` | 拉取 | 目标机 `:18445` → 本机 `:18445` |
-| `-R 18448:localhost:18448` | 暴露 | 本机 `:18448` → 目标机 `:18448` |
-| `-D 1080` | SOCKS | 不推荐，端口级转发更精确 |
+| SSH Parameter | Direction | Description |
+|---------------|-----------|-------------|
+| `-L 18445:localhost:18445` | Pull | Target `:18445` → Local `:18445` |
+| `-R 18448:localhost:18448` | Expose | Local `:18448` → Target `:18448` |
+| `-D 1080` | SOCKS | Not recommended, port-level forwarding is more precise |
 
-可以多条 `-L` / `-R` 混写，一条 SSH 连接承载多个转发。
+Multiple `-L` / `-R` flags can be combined in a single SSH connection for multiple forwards.
 
 ---
 
-## 6. 断开后重连
+## 6. Reconnection After Disconnect
 
-SSH 隧道断开后所有端口映射失效。建议用 `autossh`（Linux/Mac）自动重连：
+All port mappings become invalid when the SSH tunnel disconnects. Use `autossh` (Linux/Mac) for automatic reconnection:
 
 ```bash
-# Linux/Mac: autossh 自动重连
+# Linux/Mac: autossh auto-reconnect
 autossh -M 0 -o "ServerAliveInterval 30" -o "ServerAliveCountMax 3" \
   -L 8444:localhost:8444 -L 18445:localhost:18445 user@target-machine -N
 ```
 
-Windows 可用 `ssh` 配合批处理循环：
+Windows can use `ssh` with a batch loop:
 
 ```batch
 :loop
@@ -191,16 +191,16 @@ goto loop
 
 ---
 
-## 7. 安全考虑
+## 7. Security Considerations
 
-| 风险 | 缓解措施 |
-|------|---------|
-| 跳板机被攻破 | `-L` 绑定到 `127.0.0.1`，不对外暴露 |
-| 未授权 agent 加入 | Bridge 协议后续增加 register_token 认证 |
-| SSH 密钥泄露 | 使用独立 deploy key，仅允许端口转发 |
-| 中间人攻击 | SSH 自身加密，跳板机无法解密隧道内容 |
+| Risk | Mitigation |
+|------|-----------|
+| Jump host compromised | Bind `-L` to `127.0.0.1`, don't expose externally |
+| Unauthorized agent joining | Bridge protocol will add register_token authentication later |
+| SSH key leaked | Use dedicated deploy key, allow port forwarding only |
+| Man-in-the-middle attack | SSH encrypts traffic, jump host can't decrypt tunnel content |
 
-建议在 `~/.ssh/config` 中固定隧道参数：
+Recommended to fix tunnel parameters in `~/.ssh/config`:
 
 ```
 Host target-machine
@@ -215,4 +215,4 @@ Host target-machine
   ServerAliveInterval 30
 ```
 
-然后只要 `ssh target-machine -N` 一条命令。
+Then just `ssh target-machine -N`.

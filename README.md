@@ -1,26 +1,28 @@
-# AgentGate — Claude Code 多 Agent 通信插件
+# AgentGate — Multi-Agent Communication Infrastructure
 
 [![CI](https://github.com/freezed-corpse-143/AgentGate/actions/workflows/ci.yml/badge.svg)](https://github.com/freezed-corpse-143/AgentGate/actions/workflows/ci.yml)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.4-blue)](https://www.typescriptlang.org/)
 [![Node](https://img.shields.io/badge/Node-%3E%3D22-brightgreen)](https://nodejs.org/)
 
-AgentGate 是一个 **Claude Code MCP 插件**，利用 `notifications/claude/channel` 机制将消息自动注入到 Claude 会话上下文中，并通过去中心化的 Bridge v2 协议实现多 Agent 间的 P2P 直连通信。
+AgentGate is a **multi-channel agent communication infrastructure** that connects agents across processes and machines. It leverages the `notifications/claude/channel` mechanism to inject messages into Claude sessions and uses the decentralized Bridge v2 protocol for P2P direct connectivity between agents.
 
-**不依赖 Telegram API 或任何外部服务。** 核心机制参考官方 Telegram 插件的上下文注入模式。
+**No dependency on Telegram API or any external service.** Core mechanism inspired by the official Telegram plugin's context injection pattern.
+
+AgentGate supports **multiple channel adapters**: REST/WebSocket/SSE, Telegram Bot (single or multi-instance), SSH, and an in-process broadcast adapter for system-wide messaging.
 
 ---
 
-## 快速开始
+## Quick Start
 
-### 前置条件
+### Prerequisites
 
 - Node.js 24+
 - Claude Code v2.1.150+
-- `~/.claude.json` 已配置（见下方）
+- `~/.claude.json` configured (see below)
 
-### 安装
+### Installation
 
-#### 方式 A：从 GitHub Clone（推荐）
+#### Option A: Clone from GitHub (recommended)
 
 ```bash
 git clone https://github.com/freezed-corpse-143/AgentGate.git
@@ -29,15 +31,15 @@ npm install
 npm run build
 ```
 
-#### 方式 B：使用 Claude Plugin Directory（开发模式）
+#### Option B: Use Claude Plugin Directory (development mode)
 
 ```bash
 claude --plugin-dir /path/to/AgentGate --dangerously-load-development-channels server:agentgate
 ```
 
-### 配置 `~/.claude.json`
+### Configure `~/.claude.json`
 
-将 `<AGENTGATE_DIR>` 替换为你的实际路径（如 `/home/user/AgentGate` 或 `C:\Users\name\AgentGate`）：
+Replace `<AGENTGATE_DIR>` with your actual path (e.g. `/home/user/AgentGate` or `C:\Users\name\AgentGate`):
 
 ```json
 {
@@ -54,205 +56,297 @@ claude --plugin-dir /path/to/AgentGate --dangerously-load-development-channels s
 }
 ```
 
-> `${AGENTGATE_DEFAULT_AGENT}` 是环境变量占位符，Claude 在启动 MCP 进程前会将其替换为实际值。
-> 每个 Claude 实例设不同的值即可区分身份，无需修改配置文件。
+> `${AGENTGATE_DEFAULT_AGENT}` is an environment variable placeholder. Claude replaces it with the actual value before launching the MCP process.
+> Each Claude instance can differentiate itself by setting a different variable value, no config file changes needed.
 
-### 构建
+### Build
 
 ```bash
 npm run build
 ```
 
-### 启动（单实例）
+### Start (Single Instance)
 
 ```powershell
 $env:AGENTGATE_DEFAULT_AGENT = "agent-alpha"
 claude --dangerously-load-development-channels server:agentgate
 ```
 
-首次启动需按 Enter 确认危险模式警告。
+First launch requires pressing Enter to confirm the dangerous mode warning.
 
-### 双实例通信
+### Dual-Instance Communication
 
 ```powershell
-# 终端 A
+# Terminal A
 $env:AGENTGATE_DEFAULT_AGENT = "agent-alpha"
 claude --dangerously-load-development-channels server:agentgate
 
-# 终端 B
+# Terminal B
 $env:AGENTGATE_DEFAULT_AGENT = "agent-beta"
 claude --dangerously-load-development-channels server:agentgate
 ```
 
-启动后任一实例中用 `send_message` 工具发消息，另一侧自动在上下文中显示 `<channel>` 块。
+Once running, use the `send_message` tool in any instance — the other side automatically receives a `<channel>` block in its context.
 
 ---
 
-## 架构
+## Architecture
 
 ```
-┌─ Claude A (agent-alpha) ─────────────────┐
-│                                           │
-│  MCP Server (mcp_server.js               │
-│    ├── send_message / reply / react       │
-│    ├── list_conversations / edit_message  │
-│    └── notifications/claude/channel       │
-│                                           │
-│  BridgeAgent (:18445)                     │
-│    ├── RegistryClient → 注册中心 :8444    │
-│    └── PeerManager → P2P 直连            │
-└──────────────┬────────────────────────────┘
-               │ P2P TCP
-               ▼
-┌─ Claude B (agent-beta) ──────────────────┐
-│                                           │
-│  BridgeAgent (:18446)                     │
-│    ├── RegistryClient → 注册中心 :8444    │
-│    └── PeerManager → P2P 直连            │
-│                                           │
-│  MCP Server (mcp_server.js)              │
-│    └── notifications/claude/channel       │
-└───────────────────────────────────────────┘
+┌─ Claude A (agent-alpha) ────────────────────┐
+│                                              │
+│  MCP Server (mcp_server.js)                 │
+│    ├── send_message / reply / react          │
+│    ├── list_conversations / edit_message     │
+│    └── notifications/claude/channel          │
+│                                              │
+│  BridgeAgent (:18445)                        │
+│    ├── RegistryClient → Registry :8444       │
+│    ├── PeerManager → P2P connections         │
+│    └── RetryQueue — exponential backoff      │
+│                                              │
+│  BroadcastAdapter — process-wide broadcast   │
+│  SubscriptionManager — topic-pattern push    │
+└───────────────┬──────────────────────────────┘
+                │ P2P TCP
+                ▼
+┌─ Claude B (agent-beta) ─────────────────────┐
+│                                              │
+│  BridgeAgent (:18446)                        │
+│    ├── RegistryClient → Registry :8444       │
+│    ├── PeerManager → P2P connections         │
+│    └── RetryQueue — exponential backoff      │
+│                                              │
+│  MCP Server (mcp_server.js)                 │
+│    ├── 5 tools                              │
+│    └── notifications/claude/channel          │
+│                                              │
+│  BroadcastAdapter — process-wide broadcast   │
+│  SubscriptionManager — topic-pattern push    │
+└──────────────────────────────────────────────┘
 ```
 
-### 消息流
+### Message Flow
 
 ```
-Claude A 用户："用 send_message 给 agent-beta 发消息"
+Claude A user: "Use send_message to send a message to agent-beta"
 
-1. Claude A 调用 MCP tool: send_message(target_agent_id="agent-beta", ...)
-2. Envelope 发布到 MemoryBus → agent.agent-beta.inbound
-3. BridgeAgent.routeToPeer("agent-beta", ...) → P2P TCP 直连
-4. Beta 的 BridgeAgent 收到 → bus.publish(...)
-5. Beta 的 MCP Server 订阅触发 → mcp.notification(notifications/claude/channel)
-6. Beta 的 Claude 收到 → 上下文自动出现 <channel source="agentgate" ...>
+1. Claude A calls MCP tool: send_message(target_agent_id="agent-beta", ...)
+2. Envelope published to MemoryBus → agent.agent-beta.inbound
+3. BridgeAgent.routeToPeer("agent-beta", ...) → P2P TCP direct connection
+   → If send fails, RetryQueue enqueues with exponential backoff (1s-60s, max 8 tries)
+4. Beta's BridgeAgent receives → bus.publish(...)
+5. Beta's MCP Server subscriber triggers → mcp.notification(notifications/claude/channel)
+6. Beta's Claude receives → <channel source="agentgate" ...> appears in context
 ```
 
 ---
 
-## Bridge v2 协议
+## Bridge v2 Protocol
 
-去中心化注册 + P2P 直连，详见 [docs/BRIDGE_PROTOCOL.md](docs/BRIDGE_PROTOCOL.md)。
+Decentralized registry + P2P direct connections. See [docs/BRIDGE_PROTOCOL.md](docs/BRIDGE_PROTOCOL.md).
 
-| 组件 | 说明 |
-|------|------|
-| **注册中心** | 固定端口 8444，第一个启动的 agent 自举。管理 agent 列表，广播上下线 |
-| **P2P 直连** | agent 间直接 TCP 通信，不经过注册中心中转 |
-| **端口分配** | 默认 OS 自动分配，可通过 `AGENTGATE_BRIDGE_PORT` 指定 |
-| **心跳** | 15s 间隔，60s 超时断开 |
-
----
-
-## MCP 工具
-
-| 工具 | 用途 |
-|------|------|
-| `send_message` | 发送新消息到另一个 agent。传 `target_agent_id` 和 `text` |
-| `reply` | 回复指定对话。传 `conv_id`、`text`，可指定 `target_agent_id` 跨实例路由 |
-| `list_conversations` | 列出最近对话 |
-| `react` | 表情回应 |
-| `edit_message` | 编辑已发送的回复 |
+| Component | Description |
+|-----------|-------------|
+| **Registry** | Fixed port 8444, self-bootstrapped by the first agent. Manages agent list, broadcasts join/leave |
+| **P2P Direct** | Direct TCP communication between agents, no registry relay |
+| **Port Allocation** | OS auto-assigned by default, can be set via `AGENTGATE_BRIDGE_PORT` |
+| **Heartbeat** | 15s interval, 60s timeout disconnect |
+| **RetryQueue** | Exponential backoff retry (1s→60s, max 8 attempts), drains on peer reconnect |
+| **Advertise Host** | Use `AGENTGATE_BRIDGE_HOST` to advertise a Tailscale/public IP for cross-machine P2P |
 
 ---
 
-## 项目结构
+## Channel Adapters
+
+| Adapter | Type | Description |
+|---------|------|-------------|
+| **REST Adapter** | `rest_adapter.ts` | HTTP POST, WebSocket (`/v1/stream`), SSE (`/v1/events`), dashboard, handshake endpoints |
+| **Telegram Adapter** | `telegram_adapter.ts` | Grammy-based long-polling bot. Supports single or multi-instance (`telegrams[]`) |
+| **SSH Adapter** | `ssh_adapter.ts` | SSH server with password/pubkey auth, shell + exec modes |
+| **Broadcast Adapter** | `broadcast_adapter.ts` | Process-internal broadcast on `_broadcast` topic. Loop prevention via seenIds Set |
+
+---
+
+## MCP Tools
+
+| Tool | Purpose |
+|------|---------|
+| `send_message` | Send a new message to another agent. Takes `target_agent_id` and `text` |
+| `reply` | Reply to a conversation. Takes `conv_id`, `text`, optional `target_agent_id` for cross-instance routing |
+| `list_conversations` | List recent conversations |
+| `react` | Emoji reaction |
+| `edit_message` | Edit a previously sent reply |
+
+Every tool response includes any **pending messages** (inbound messages queued since the last tool call), listed as:
+
+```
+📬 Pending Messages (2):
+  🔔 agent-alpha: "Hello!" (conv: conv_xxx)
+  🔔 agent-gamma: "How are you?" (conv: conv_yyy)
+```
+
+---
+
+## SubscriptionManager — Topic-Based Push
+
+The `SubscriptionManager` allows external users to subscribe to topic patterns. When matching Envelopes pass through the bus, notifications are automatically pushed via the appropriate channel adapter.
+
+**Use cases:**
+- Subscribe to `agent.*.inbound` → receive all agent inbound messages
+- Subscribe to `agent.agent-alpha.outbound` → receive replies from a specific agent
+- Subscribe to `_broadcast` → receive all broadcast notifications
+
+**Glob-style patterns:** `agent.*.inbound`, `agent.agent-alpha.*`, `_broadcast`
+
+---
+
+## Project Structure
 
 ```
 src/
-  mcp_server.ts              — MCP Server 入口（核心）
-  server.ts                  — 服务启动函数
-  config.ts                  — 配置加载
-  types.ts                   — 类型定义
-  index.ts                   — CLI 入口
+  mcp_server.ts              — MCP Server entry point (Claude integration)
+  server.ts                  — Server bootstrap & wiring
+  config.ts                  — Config loading (YAML + env overrides)
+  types.ts                   — Core type definitions
+  index.ts                   — CLI entry point (Commander)
 
   bus/
-    memory_bus.ts            — 发布/订阅消息总线
-    peer_bridge.ts           — Bridge v2：注册 + P2P 直连
-    outbound_dispatcher.ts   — 出站消息分发
+    memory_bus.ts            — In-memory pub/sub message bus
+    peer_bridge.ts           — Bridge v2: decentralized registry + P2P
+    outbound_dispatcher.ts   — Route outbound envelopes to adapters
+    retry_queue.ts           — Exponential-backoff P2P retry queue
 
   agents/
-    registry.ts              — Agent 注册中心
-    runtime.ts               — 消息路由 + 循环检测
+    registry.ts              — Agent registry (find/list/register)
+    runtime.ts               — Message routing + loop detection
 
   auth/
-    binding_store.ts         — 绑定存储
-    handshake.ts             — 配对握手
+    binding_store.ts         — Channel↔Agent binding persistence
+    handshake.ts             — Pairing code generation & verification
 
   channels/
-    base.ts                  — 信道适配器接口
-    telegram_adapter.ts      — Telegram 信道
-    ssh_adapter.ts           — SSH 信道
-    rest_adapter.ts          — REST API 信道
+    base.ts                  — ChannelAdapter interface
+    rest_adapter.ts          — REST/WebSocket/SSE adapter
+    telegram_adapter.ts      — Telegram bot adapter (grammy)
+    ssh_adapter.ts           — SSH server adapter
+    broadcast_adapter.ts     — In-process broadcast adapter
 
   gateway/
-    channel_gateway.ts       — 消息网关
-    envelope.ts              — 消息模型 + 循环检测
+    channel_gateway.ts       — RawMessage→Envelope gateway
+    envelope.ts              — Envelope factory, validation, loop detection
 
   sessions/
-    router.ts                — 会话路由
-    session_registry.ts      — 会话注册
+    router.ts                — Envelope→session→agent routing
+    session_registry.ts      — Session lifecycle management
 
   storage/
-    conversation_store.ts    — 消息持久化
-    conversation_sync.ts     — 跨进程同步
+    conversation_store.ts    — Message persistence (JSON files)
+    conversation_sync.ts     — Cross-process conversation sync
 
-.mcp.json                  — MCP server 注册
-.claude-plugin/            — 插件 manifest
-skills/                    — Skill 插件
+  subscriptions/
+    manager.ts               — Topic-pattern subscription/push engine
+
+.mcp.json                  — MCP server registration
+.claude-plugin/            — Plugin manifest
+skills/                    — Skill plugins
 
 docs/
-  BRIDGE_PROTOCOL.md         — Bridge v2 协议文档
-  CLAUDE_COMMS.md            — 实测报告与 channel 协议分析
-  DEBUG.md                   — 调试指南
-  SSH_MESH.md                — SSH 跨主机组网方案
+  BRIDGE_PROTOCOL.md         — Bridge v2 protocol specification
+  CLAUDE_COMMS.md            — Channel protocol analysis & test report
+  DEBUG.md                   — Debugging guide
+  DIAGNOSTICS.md             — Layered diagnostic manual
+  SSH_MESH.md                — SSH cross-host networking
+  TAILSCALE_MESH.md          — Tailscale cross-host networking
 
 tests/
-  unit/                      — 10 文件, 85 测试
-  integration/               — 集成测试
-  e2e/                       — 端到端测试
+  unit/                      — 10 files, 85 tests
+  integration/               — Integration tests
+  e2e/                       — End-to-end tests
 ```
 
 ---
 
-## 环境变量
+## Configuration
 
-| 变量 | 默认值 | 说明 |
-|------|--------|------|
-| `AGENTGATE_DEFAULT_AGENT` | `default` | 当前 agent 的身份 ID |
-| `AGENTGATE_BRIDGE_PORT` | `0`（自动分配） | 当前 agent 的 Bridge 监听端口 |
-| `AGENTGATE_REGISTRY_PORT` | `8444` | 注册中心端口 |
-| `AGENTGATE_REGISTRY_HOST` | `127.0.0.1` | 注册中心地址 |
-| `AGENTGATE_DIR` | `~/.agentgate` | 数据目录 |
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `AGENTGATE_DEFAULT_AGENT` | `default` | Current agent's identity ID |
+| `AGENTGATE_BRIDGE_PORT` | `0` (auto) | Bridge listen port for this agent |
+| `AGENTGATE_BRIDGE_HOST` | `127.0.0.1` | Advertised host address (set to Tailscale IP for cross-machine) |
+| `AGENTGATE_REGISTRY_PORT` | `8444` | Registry port |
+| `AGENTGATE_REGISTRY_HOST` | `127.0.0.1` | Registry address |
+| `AGENTGATE_DIR` | `~/.agentgate` | Data directory |
+| `AGENTGATE_BRIDGE_ENABLED` | `true` | Set to `false` or `0` to disable bridge |
+| `TELEGRAM_BOT_TOKEN` | — | Telegram bot token (alternative to config file) |
+
+### Config File (`agentgate.yaml` or `~/.agentgate/config.yaml`)
+
+```yaml
+server:
+  defaultAgent: default
+
+channels:
+  rest:
+    enabled: true
+    port: 3000
+    host: 0.0.0.0
+
+  telegram:
+    enabled: false
+    token: ""                     # or set via TELEGRAM_BOT_TOKEN
+    apiRoot: ""                   # custom API root (testing)
+
+  telegrams:                      # multi-bot array
+    - token: "123456:ABC"
+      allowFrom: [admin]
+    - token: "789012:DEF"
+
+agents:
+  - id: default
+    name: Default Agent
+    description: Built-in default agent
+    capabilities: [chat, echo]
+
+logging:
+  level: info                     # debug | info | warn | error
+```
 
 ---
 
-## 开发
+## Development
 
 ```bash
-# 构建
+# Build
 npm run build
 
-# 测试
-npx vitest run tests/unit        # 85 单元测试
-npx vitest run tests/integration # 集成测试
+# Test
+npx vitest run tests/unit        # 85 unit tests
+npx vitest run tests/integration # integration tests
 
-# 启动 Claude（单实例）
+# Type check
+npm run typecheck
+
+# Start Claude (single instance)
 $env:AGENTGATE_DEFAULT_AGENT = "agent-alpha"
 claude --dangerously-load-development-channels server:agentgate
 ```
 
 ---
 
-## 参考
+## Reference
 
-### 文档
-- [docs/BRIDGE_PROTOCOL.md](docs/BRIDGE_PROTOCOL.md) — Bridge v2 协议
-- [docs/CLAUDE_COMMS.md](docs/CLAUDE_COMMS.md) — channel 协议分析与实测报告
-- [docs/DEBUG.md](docs/DEBUG.md) — 调试指南
-- [docs/SSH_MESH.md](docs/SSH_MESH.md) — SSH 跨主机组网方案
-- [docs/TAILSCALE_MESH.md](docs/TAILSCALE_MESH.md) — Tailscale 跨主机组网方案
+### Documentation
+- [docs/BRIDGE_PROTOCOL.md](docs/BRIDGE_PROTOCOL.md) — Bridge v2 protocol
+- [docs/CLAUDE_COMMS.md](docs/CLAUDE_COMMS.md) — Channel protocol analysis & test report
+- [docs/DEBUG.md](docs/DEBUG.md) — Debugging guide
+- [docs/DIAGNOSTICS.md](docs/DIAGNOSTICS.md) — Layered diagnostic manual
+- [docs/SSH_MESH.md](docs/SSH_MESH.md) — SSH cross-host networking
+- [docs/TAILSCALE_MESH.md](docs/TAILSCALE_MESH.md) — Tailscale cross-host networking
 
 ### CI/CD
 - `.github/workflows/ci.yml` — GitHub Actions: typecheck + unit tests + integration tests + build
-- `Dockerfile` — 多阶段构建，生产镜像仅 100MB+
-- 测试: `npm test`（unit + integration，排除 e2e），`npm run typecheck`
+- `Dockerfile` — Multi-stage build, production image ~100MB+
+- Tests: `npm test` (unit + integration, excludes e2e), `npm run typecheck`
