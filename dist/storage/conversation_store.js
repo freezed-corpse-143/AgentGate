@@ -16,6 +16,10 @@ export class ConversationStore {
     indexLoaded = false;
     /** 追加消息时的回调（用于跨进程同步） */
     onAppend = null;
+    /** 编辑消息时的回调 */
+    onEdit = null;
+    /** 添加反应时的回调 */
+    onReaction = null;
     constructor(agentId) {
         const baseDir = agentId
             ? join(BASE_DIR, agentId)
@@ -190,6 +194,15 @@ export class ConversationStore {
             summary.last_active_at = new Date().toISOString();
             this.index.set(convId, summary);
         }
+        // 触发编辑同步回调
+        if (this.onEdit) {
+            try {
+                this.onEdit(convId, messageId, text);
+            }
+            catch (err) {
+                console.error(`[ConversationStore] onEdit callback error: ${err}`);
+            }
+        }
         return true;
     }
     /** 给消息添加表情反应 */
@@ -206,6 +219,15 @@ export class ConversationStore {
         }
         msg.metadata = { ...msg.metadata, reactions };
         this.saveConversation(convId, messages);
+        // 触发反应同步回调
+        if (this.onReaction) {
+            try {
+                this.onReaction(convId, messageId, emoji, agentId);
+            }
+            catch (err) {
+                console.error(`[ConversationStore] onReaction callback error: ${err}`);
+            }
+        }
         return true;
     }
     /** 获取会话概要 */

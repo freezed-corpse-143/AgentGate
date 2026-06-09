@@ -56,7 +56,68 @@ export class ConversationSync {
       this.handleLocalAppend(record)
     }
 
-    // 2. 监听远端同步消息 → 追加到本地
+    // 2. 监听本地 edit → 广播（先标记再发布，防同进程回环）
+    this.store.onEdit = (convId, messageId, text) => {
+      if (!this.enabled) return
+      const dedupKey = `edit:${messageId}`
+      this.syncedIds.set(dedupKey, Date.now())
+      this.cleanup()
+      this.bus.publish(SYNC_TOPIC, {
+        message_id: messageId,
+        trace_id: `sync_${Date.now().toString(36)}`,
+        channel: 'agentgate' as const,
+        channel_user_id: 'system',
+        agent_id: 'system',
+        conversation_id: convId,
+        direction: 'inbound' as const,
+        type: 'system_alert' as const,
+        payload: {
+          text,
+          data: {
+            _sync: true,
+            _sync_type: 'edit',
+            message_id: messageId,
+            conversation_id: convId,
+            text,
+            timestamp: new Date().toISOString(),
+          },
+        },
+        timestamp: new Date().toISOString(),
+      })
+    }
+
+    // 3. 监听本地 reaction → 广播（先标记再发布，防同进程回环）
+    this.store.onReaction = (convId, messageId, emoji, agentId) => {
+      if (!this.enabled) return
+      const dedupKey = `reaction:${messageId}:${emoji}:${agentId}`
+      this.syncedIds.set(dedupKey, Date.now())
+      this.cleanup()
+      this.bus.publish(SYNC_TOPIC, {
+        message_id: messageId,
+        trace_id: `sync_${Date.now().toString(36)}`,
+        channel: 'agentgate' as const,
+        channel_user_id: agentId,
+        agent_id: 'system',
+        conversation_id: convId,
+        direction: 'inbound' as const,
+        type: 'system_alert' as const,
+        payload: {
+          text: emoji,
+          data: {
+            _sync: true,
+            _sync_type: 'reaction',
+            message_id: messageId,
+            conversation_id: convId,
+            emoji,
+            agent_id: agentId,
+            timestamp: new Date().toISOString(),
+          },
+        },
+        timestamp: new Date().toISOString(),
+      })
+    }
+
+    // 4. 监听远端同步消息 → 追加/编辑/反应到本地
     this.bus.subscribeWildcard(SYNC_TOPIC, (envelope: any) => {
       this.handleRemoteSync(envelope)
     })
@@ -109,7 +170,7 @@ export class ConversationSync {
     })
   }
 
-  /** 收到远端同步消息 → 追加到本地 */
+  /** 收到远端同步消息 → 追加/编辑/反应到本地 */
   private handleRemoteSync(envelope: any): void {
     if (!this.enabled) return
 
@@ -119,35 +180,54 @@ export class ConversationSync {
     const msgId = data.message_id as string
     if (!msgId) return
 
-    // 防止自身消息被重复处理
-    if (this.syncedIds.has(msgId)) return
+    const syncType = (data._sync_type as string) ?? 'message'
+    const dedupKey = `${syncType}:${msgId}`
 
-    // 标记已同步，防止本地 append 时再广播回去
-    this.syncedIds.set(msgId, Date.now())
+    // 防止重复处理
+    if (this.syncedIds.has(dedupKey)) return
+    this.syncedIds.set(dedupKey, Date.now())
     this.cleanup()
 
-    const record: MessageRecord = {
-      message_id: msgId,
-      conversation_id: data.conversation_id as string,
-      agent_id: data.agent_id as string,
-      role: data.role as MessageRecord['role'],
-      text: data.text as string,
-      channel: data.channel as MessageRecord['channel'],
-      channel_user_id: data.channel_user_id as string,
-      timestamp: data.timestamp as string,
-      metadata: data.metadata as Record<string, unknown> | undefined,
+    switch (syncType) {
+      case 'edit': {
+        // 远端编辑 → 本地更新
+        const editConvId = data.conversation_id as string
+        const editText = data.text as string
+        this.store.updateMessage(editConvId, msgId, editText)
+        break
+      }
+      case 'reaction': {
+        // 远端反应 → 本地添加
+        const rConvId = data.conversation_id as string
+        const rEmoji = data.emoji as string
+        const rAgentId = data.agent_id as string
+        this.store.addReaction(rConvId, msgId, rEmoji, rAgentId)
+        break
+      }
+      default: {
+        // 远端新消息 → 追加到本地
+        const record: MessageRecord = {
+          message_id: msgId,
+          conversation_id: data.conversation_id as string,
+          agent_id: data.agent_id as string,
+          role: data.role as MessageRecord['role'],
+          text: data.text as string,
+          channel: data.channel as MessageRecord['channel'],
+          channel_user_id: data.channel_user_id as string,
+          timestamp: data.timestamp as string,
+          metadata: data.metadata as Record<string, unknown> | undefined,
+        }
+        this.store.appendMessage(record)
+      }
     }
-
-    // 追加到本地 store（会触发 onAppend，但 syncedIds 阻止回环）
-    this.store.appendMessage(record)
   }
 
   /** 停止同步 */
   stop(): void {
     this.enabled = false
-    if (this.store.onAppend === this.handleLocalAppend.bind(this)) {
-      this.store.onAppend = null
-    }
+    this.store.onAppend = null
+    this.store.onEdit = null
+    this.store.onReaction = null
     this.syncedIds.clear()
   }
 

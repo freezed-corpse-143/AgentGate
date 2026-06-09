@@ -51,6 +51,10 @@ export class ConversationStore {
   private indexLoaded = false
   /** 追加消息时的回调（用于跨进程同步） */
   onAppend: AppendCallback | null = null
+  /** 编辑消息时的回调 */
+  onEdit: ((convId: string, messageId: string, text: string) => void) | null = null
+  /** 添加反应时的回调 */
+  onReaction: ((convId: string, messageId: string, emoji: string, agentId: string) => void) | null = null
 
   constructor(agentId?: string) {
     const baseDir = agentId
@@ -228,6 +232,12 @@ export class ConversationStore {
       summary.last_active_at = new Date().toISOString()
       this.index.set(convId, summary)
     }
+    // 触发编辑同步回调
+    if (this.onEdit) {
+      try { this.onEdit(convId, messageId, text) } catch (err) {
+        console.error(`[ConversationStore] onEdit callback error: ${err}`)
+      }
+    }
     return true
   }
 
@@ -243,6 +253,12 @@ export class ConversationStore {
     }
     msg.metadata = { ...msg.metadata, reactions }
     this.saveConversation(convId, messages)
+    // 触发反应同步回调
+    if (this.onReaction) {
+      try { this.onReaction(convId, messageId, emoji, agentId) } catch (err) {
+        console.error(`[ConversationStore] onReaction callback error: ${err}`)
+      }
+    }
     return true
   }
 

@@ -29,6 +29,10 @@ export declare class ConversationStore {
     private indexLoaded;
     /** 追加消息时的回调（用于跨进程同步） */
     onAppend: AppendCallback | null;
+    /** 编辑消息时的回调 */
+    onEdit: ((convId: string, messageId: string, text: string) => void) | null;
+    /** 添加反应时的回调 */
+    onReaction: ((convId: string, messageId: string, emoji: string, agentId: string) => void) | null;
     constructor(agentId?: string);
     /** 将 ~/.agentgate/conversations/ 中的旧对话迁移到 agent 子目录 */
     private migrateFromBaseDir;

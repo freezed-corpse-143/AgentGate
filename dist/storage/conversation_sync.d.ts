@@ -32,7 +32,7 @@ export declare class ConversationSync {
     constructor(bus: MessageBus, store: ConversationStore, opts?: ConversationSyncOptions);
     /** 本地追加消息 → 广播到远端 */
     private handleLocalAppend;
-    /** 收到远端同步消息 → 追加到本地 */
+    /** 收到远端同步消息 → 追加/编辑/反应到本地 */
     private handleRemoteSync;
     /** 停止同步 */
     stop(): void;
