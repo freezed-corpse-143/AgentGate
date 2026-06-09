@@ -41,7 +41,7 @@
 
 ```powershell
 $env:AGENTGATE_DEFAULT_AGENT = "agent-alpha"
-claude --dangerously-load-development-channels server:agentgate
+claude --plugin-dir /path/to/AgentGate
 ```
 
 First launch requires pressing Enter to confirm the dangerous mode warning. Subsequent launches can use `--dangerously-skip-permissions`.
@@ -51,11 +51,11 @@ First launch requires pressing Enter to confirm the dangerous mode warning. Subs
 ```powershell
 # Terminal A
 $env:AGENTGATE_DEFAULT_AGENT = "agent-alpha"
-claude --dangerously-load-development-channels server:agentgate
+claude --plugin-dir /path/to/AgentGate
 
 # Terminal B
 $env:AGENTGATE_DEFAULT_AGENT = "agent-beta"
-claude --dangerously-load-development-channels server:agentgate
+claude --plugin-dir /path/to/AgentGate
 ```
 
 After startup:
@@ -70,17 +70,17 @@ After startup:
 # Terminal A
 $env:AGENTGATE_DEFAULT_AGENT = "agent-alpha"
 $env:AGENTGATE_BRIDGE_PORT = "18445"     # Optional: specify Bridge port
-claude --dangerously-load-development-channels server:agentgate
+claude --plugin-dir /path/to/AgentGate
 
 # Terminal B
 $env:AGENTGATE_DEFAULT_AGENT = "agent-beta"
 $env:AGENTGATE_BRIDGE_PORT = "18446"
-claude --dangerously-load-development-channels server:agentgate
+claude --plugin-dir /path/to/AgentGate
 
 # Terminal C
 $env:AGENTGATE_DEFAULT_AGENT = "agent-gamma"
 $env:AGENTGATE_BRIDGE_PORT = "18447"
-claude --dangerously-load-development-channels server:agentgate
+claude --plugin-dir /path/to/AgentGate
 ```
 
 All agents discover each other through the registry and establish a fully-connected P2P network.
@@ -137,13 +137,13 @@ Configuration methods:
 ```powershell
 # Method A: Environment variable
 $env:AGENTGATE_BRIDGE_PORT = "18445"
-claude --dangerously-load-development-channels server:agentgate
+claude --plugin-dir /path/to/AgentGate
 
 # Method B: Persisted file
 echo 18445 > ~\.agentgate\ports\agent-alpha
 
 # Method C: Auto-assignment
-claude --dangerously-load-development-channels server:agentgate
+claude --plugin-dir /path/to/AgentGate
 ```
 
 ---
@@ -386,16 +386,16 @@ This means two Claude instances can share the same `~/.claude.json`. They differ
 # Terminal A — self-bootstrap as registry
 $env:AGENTGATE_DEFAULT_AGENT = "agent-alpha"
 $env:AGENTGATE_BRIDGE_PORT = "18445"
-claude --dangerously-load-development-channels server:agentgate
+claude --plugin-dir /path/to/AgentGate
 
 # Terminal B — normal agent
 $env:AGENTGATE_DEFAULT_AGENT = "agent-beta"
 $env:AGENTGATE_BRIDGE_PORT = "18446"
-claude --dangerously-load-development-channels server:agentgate
+claude --plugin-dir /path/to/AgentGate
 
 # Terminal C — auto-assigned port
 $env:AGENTGATE_DEFAULT_AGENT = "agent-gamma"
-claude --dangerously-load-development-channels server:agentgate
+claude --plugin-dir /path/to/AgentGate
 ```
 
 ---

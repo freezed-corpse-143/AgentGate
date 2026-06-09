@@ -36,8 +36,8 @@ export class ConversationSync {
   private bus: MessageBus
   private store: ConversationStore
   private enabled: boolean
-  /** 追踪已从远端同步的 message_id，防止回路 */
-  private syncedIds: Set<string> = new Set()
+  /** 追踪已从远端同步的 message_id，防止回路。值: 加入时间戳 */
+  private syncedIds: Map<string, number> = new Map()
   private lastCleanup: number = Date.now()
 
   constructor(
@@ -77,7 +77,7 @@ export class ConversationSync {
     }
 
     // 先加入 syncedIds 防止本地回环（bus.publish 会触发同进程的 handleRemoteSync）
-    this.syncedIds.add(msgId)
+    this.syncedIds.set(msgId, Date.now())
     this.cleanup()
 
     // 发布到系统 topic
@@ -123,7 +123,7 @@ export class ConversationSync {
     if (this.syncedIds.has(msgId)) return
 
     // 标记已同步，防止本地 append 时再广播回去
-    this.syncedIds.add(msgId)
+    this.syncedIds.set(msgId, Date.now())
     this.cleanup()
 
     const record: MessageRecord = {
@@ -151,12 +151,22 @@ export class ConversationSync {
     this.syncedIds.clear()
   }
 
+  /** LRU 淘汰：超过上限时淘汰最旧的一半条目，保留最近的 */
   private cleanup(): void {
     const now = Date.now()
     if (now - this.lastCleanup < CLEANUP_INTERVAL_MS) return
     this.lastCleanup = now
+
     if (this.syncedIds.size > MAX_SEEN_IDS) {
-      this.syncedIds.clear()
+      // 按时间戳排序，保留最近的一半
+      const entries = Array.from(this.syncedIds.entries())
+        .sort((a, b) => a[1] - b[1])
+      const evictCount = Math.floor(entries.length / 2)
+      const evicted = entries.slice(0, evictCount)
+      for (const [id] of evicted) {
+        this.syncedIds.delete(id)
+      }
+      console.error(`[ConversationSync] LRU eviction: removed ${evictCount} of ${entries.length} syncedIds`)
     }
   }
 }

@@ -395,7 +395,7 @@ After agent-beta receives a message, its stderr should output:
 
 | Symptom | Cause |
 |---------|-------|
-| Notification sent but Claude doesn't display `<channel>` | May be limited to marketplace-installed plugins. `--dangerously-load-development-channels` may bypass |
+| Notification sent but Claude doesn't display `<channel>` | May be limited to marketplace-installed plugins. `--plugin-dir` may bypass |
 | Claude responds "no agentgate tools" | `.mcp.json` path incorrect, or MCP Server startup error |
 
 ---
@@ -410,7 +410,7 @@ After agent-beta receives a message, its stderr should output:
 | Registry only has 1 peer | Second instance not connected / connected to stale registry | Layer 2 |
 | Message sent successfully but no response | `pendingMessages` queue requires next tool call to flush | Layer 4 |
 | Bridge connects then immediately disconnects | Heartbeat timeout (60s) — check network latency | Layer 3 |
-| Notification sent but Claude doesn't display | Version restriction — try `--dangerously-load-development-channels` | Layer 5 |
+| Notification sent but Claude doesn't display | Version restriction — try `--plugin-dir` | Layer 5 |
 
 ---
 

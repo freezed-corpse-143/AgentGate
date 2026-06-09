@@ -4,7 +4,7 @@
  * 按 conversation_id 持久化消息历史。每个 conversation 存为独立的 JSON 文件。
  * 路径: ~/.agentgate/conversations/{conversation_id}.json
  */
-import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'fs'
+import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, renameSync, unlinkSync } from 'fs'
 import { homedir } from 'os'
 import { join } from 'path'
 import type { ChannelType } from '../types.js'
@@ -52,8 +52,45 @@ export class ConversationStore {
   /** 追加消息时的回调（用于跨进程同步） */
   onAppend: AppendCallback | null = null
 
-  constructor() {
-    this.convDir = join(BASE_DIR, 'conversations')
+  constructor(agentId?: string) {
+    const baseDir = agentId
+      ? join(BASE_DIR, agentId)
+      : BASE_DIR
+    this.convDir = join(baseDir, 'conversations')
+    // 迁移旧路径数据到新 agent 子目录
+    if (agentId) {
+      this.migrateFromBaseDir()
+    }
+  }
+
+  /** 将 ~/.agentgate/conversations/ 中的旧对话迁移到 agent 子目录 */
+  private migrateFromBaseDir(): void {
+    const oldConvDir = join(BASE_DIR, 'conversations')
+    try {
+      if (!existsSync(oldConvDir)) return
+      mkdirSync(this.convDir, { recursive: true })
+      const files = readdirSync(oldConvDir)
+      let migrated = 0
+      for (const f of files) {
+        if (!f.endsWith('.json')) continue
+        const oldPath = join(oldConvDir, f)
+        const newPath = join(this.convDir, f)
+        if (existsSync(newPath)) continue // 新路径已有，跳过
+        try {
+          const content = readFileSync(oldPath, 'utf8')
+          writeFileSync(newPath, content)
+          unlinkSync(oldPath)
+          migrated++
+        } catch {
+          // 跳过无法迁移的文件
+        }
+      }
+      if (migrated > 0) {
+        console.error(`[ConversationStore] Migrated ${migrated} conversations to ${this.convDir}`)
+      }
+    } catch {
+      // 迁移失败不阻塞启动
+    }
   }
 
   // ── 内部工具 ──────────────────────────────────────────────
@@ -95,9 +132,28 @@ export class ConversationStore {
     }
   }
 
+  /** 原子写入：先写临时文件，再 rename，崩溃安全 */
   private saveConversation(id: string, messages: MessageRecord[]): void {
     mkdirSync(this.convDir, { recursive: true })
-    writeFileSync(this.convPath(id), JSON.stringify(messages, null, 2))
+    const targetPath = this.convPath(id)
+    const tmpPath = targetPath + '.tmp'
+    const content = JSON.stringify(messages, null, 2)
+
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        writeFileSync(tmpPath, content)
+        renameSync(tmpPath, targetPath)
+        return
+      } catch (err) {
+        if (attempt === 3) {
+          console.error(`[ConversationStore] Failed to save ${id} after 3 attempts: ${err}`)
+          throw err
+        }
+        // 短暂延迟后重试（同步忙等待，在文件系统竞争场景下足够）
+        const start = Date.now()
+        while (Date.now() - start < attempt * 5) { /* spin */ }
+      }
+    }
   }
 
   private loadMessages(id: string): MessageRecord[] {
@@ -111,9 +167,14 @@ export class ConversationStore {
 
   // ── 公开 API ──────────────────────────────────────────────
 
-  /** 追加一条消息到对话 */
+  /** 追加一条消息到对话（自动去重） */
   appendMessage(msg: MessageRecord): void {
     const messages = this.loadMessages(msg.conversation_id)
+    // 去重：相同 message_id 已在对话中则跳过
+    if (messages.some(m => m.message_id === msg.message_id)) {
+      console.warn(`[ConversationStore] Skipping duplicate message: ${msg.message_id}`)
+      return
+    }
     messages.push(msg)
     this.saveConversation(msg.conversation_id, messages)
 
@@ -147,6 +208,42 @@ export class ConversationStore {
     const offset = options?.offset ?? 0
     const limit = options?.limit ?? messages.length
     return messages.slice(offset, offset + limit)
+  }
+
+  /** 更新消息文本（用于编辑）返回是否成功 */
+  updateMessage(convId: string, messageId: string, text: string): boolean {
+    const messages = this.loadMessages(convId)
+    const msg = messages.find(m => m.message_id === messageId)
+    if (!msg) return false
+    // 保存编辑历史
+    const editEntry = { text: msg.text, edited_at: new Date().toISOString() }
+    const editHistory = (msg.metadata?.edit_history as Array<{text: string; edited_at: string}> | undefined) ?? []
+    editHistory.push(editEntry)
+    msg.text = text
+    msg.metadata = { ...msg.metadata, edited: true, edited_at: new Date().toISOString(), edit_history: editHistory }
+    this.saveConversation(convId, messages)
+    // 更新索引中的最后活跃时间
+    const summary = this.index.get(convId)
+    if (summary) {
+      summary.last_active_at = new Date().toISOString()
+      this.index.set(convId, summary)
+    }
+    return true
+  }
+
+  /** 给消息添加表情反应 */
+  addReaction(convId: string, messageId: string, emoji: string, agentId: string): boolean {
+    const messages = this.loadMessages(convId)
+    const msg = messages.find(m => m.message_id === messageId)
+    if (!msg) return false
+    const reactions = (msg.metadata?.reactions as Record<string, string[]> | undefined) ?? {}
+    if (!reactions[emoji]) reactions[emoji] = []
+    if (!reactions[emoji].includes(agentId)) {
+      reactions[emoji].push(agentId)
+    }
+    msg.metadata = { ...msg.metadata, reactions }
+    this.saveConversation(convId, messages)
+    return true
   }
 
   /** 获取会话概要 */

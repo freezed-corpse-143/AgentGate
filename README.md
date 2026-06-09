@@ -16,8 +16,8 @@ AgentGate supports **multiple channel adapters**: REST/WebSocket/SSE, Telegram B
 
 ### Prerequisites
 
-- Node.js 24+
-- Claude Code v2.1.150+
+- Node.js 22+
+- Claude Code v2.1.160+ (tested with v2.1.169)
 - `~/.claude.json` configured (see below)
 
 ### Installation
@@ -31,11 +31,13 @@ npm install
 npm run build
 ```
 
-#### Option B: Use Claude Plugin Directory (development mode)
+#### Option B: Use Claude Plugin Directory
 
 ```bash
-claude --plugin-dir /path/to/AgentGate --dangerously-load-development-channels server:agentgate
+claude --plugin-dir /path/to/AgentGate
 ```
+
+The MCP server auto-starts from `~/.claude.json` configuration. No special flags needed.
 
 ### Configure `~/.claude.json`
 
@@ -67,23 +69,23 @@ npm run build
 
 ### Start (Single Instance)
 
-```powershell
-$env:AGENTGATE_DEFAULT_AGENT = "agent-alpha"
-claude --dangerously-load-development-channels server:agentgate
-```
+```bash
+# Linux/macOS
+AGENTGATE_DEFAULT_AGENT=agent-alpha claude --plugin-dir /path/to/AgentGate
 
-First launch requires pressing Enter to confirm the dangerous mode warning.
+# Windows PowerShell
+$env:AGENTGATE_DEFAULT_AGENT = "agent-alpha"
+claude --plugin-dir C:\Projects\AgentGate
+```
 
 ### Dual-Instance Communication
 
-```powershell
+```bash
 # Terminal A
-$env:AGENTGATE_DEFAULT_AGENT = "agent-alpha"
-claude --dangerously-load-development-channels server:agentgate
+AGENTGATE_DEFAULT_AGENT=agent-alpha claude --plugin-dir /path/to/AgentGate
 
 # Terminal B
-$env:AGENTGATE_DEFAULT_AGENT = "agent-beta"
-claude --dangerously-load-development-channels server:agentgate
+AGENTGATE_DEFAULT_AGENT=agent-beta claude --plugin-dir /path/to/AgentGate
 ```
 
 Once running, use the `send_message` tool in any instance — the other side automatically receives a `<channel>` block in its context.
@@ -154,6 +156,8 @@ Decentralized registry + P2P direct connections. See [docs/BRIDGE_PROTOCOL.md](d
 | **Heartbeat** | 15s interval, 60s timeout disconnect |
 | **RetryQueue** | Exponential backoff retry (1s→60s, max 8 attempts), drains on peer reconnect |
 | **Advertise Host** | Use `AGENTGATE_BRIDGE_HOST` to advertise a Tailscale/public IP for cross-machine P2P |
+| **Registry Secret** | Set `AGENTGATE_REGISTRY_SECRET` to require HMAC-signed registrations for multi-machine security |
+| **Agent Pairing** | Use `request_pairing` / `verify_pairing` tools for agent-to-agent trust verification |
 
 ---
 
@@ -175,15 +179,24 @@ Decentralized registry + P2P direct connections. See [docs/BRIDGE_PROTOCOL.md](d
 | `send_message` | Send a new message to another agent. Takes `target_agent_id` and `text` |
 | `reply` | Reply to a conversation. Takes `conv_id`, `text`, optional `target_agent_id` for cross-instance routing |
 | `list_conversations` | List recent conversations |
-| `react` | Emoji reaction |
-| `edit_message` | Edit a previously sent reply |
+| `react` | Emoji reaction to a message |
+| `edit_message` | Edit a previously sent reply (with edit history tracking) |
+| `get_status` | Check system status: peers, pending messages, push mode |
+| `request_pairing` | Generate a 6-digit pairing code for agent-to-agent trust |
+| `verify_pairing` | Verify a pairing code from another agent |
+
+> **Known limitation:** `notifications/claude/channel` push does not work with `--plugin-dir` loading in Claude v2.1.169. Messages arrive via pull-based pending messages queue — appended to the next tool response. Set `AGENTGATE_PUSH_MODE=off` to disable channel attempts.
 
 Every tool response includes any **pending messages** (inbound messages queued since the last tool call), listed as:
 
 ```
-📬 Pending Messages (2):
-  🔔 agent-alpha: "Hello!" (conv: conv_xxx)
-  🔔 agent-gamma: "How are you?" (conv: conv_yyy)
+📬 ── 2 NEW MESSAGES ─────────────────────
+  🔔 agent-alpha: "Hello!"
+     conv: conv_xxx
+  🔔 agent-gamma: "How are you?"
+     conv: conv_yyy
+──────────────────────────────────────────
+Use reply or send_message to respond.
 ```
 
 ---
@@ -323,15 +336,18 @@ logging:
 npm run build
 
 # Test
-npx vitest run tests/unit        # 85 unit tests
-npx vitest run tests/integration # integration tests
+npx vitest run tests/unit            # 85 unit tests
+npx vitest run tests/integration     # integration tests
+
+# Health check
+node dist/index.js health            # human-readable
+node dist/index.js health --json     # machine-readable
 
 # Type check
 npm run typecheck
 
 # Start Claude (single instance)
-$env:AGENTGATE_DEFAULT_AGENT = "agent-alpha"
-claude --dangerously-load-development-channels server:agentgate
+AGENTGATE_DEFAULT_AGENT=agent-alpha claude --plugin-dir /path/to/AgentGate
 ```
 
 ---

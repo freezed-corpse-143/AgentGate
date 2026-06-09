@@ -26,7 +26,7 @@ export declare class ConversationSync {
     private bus;
     private store;
     private enabled;
-    /** 追踪已从远端同步的 message_id，防止回路 */
+    /** 追踪已从远端同步的 message_id，防止回路。值: 加入时间戳 */
     private syncedIds;
     private lastCleanup;
     constructor(bus: MessageBus, store: ConversationStore, opts?: ConversationSyncOptions);
@@ -36,6 +36,7 @@ export declare class ConversationSync {
     private handleRemoteSync;
     /** 停止同步 */
     stop(): void;
+    /** LRU 淘汰：超过上限时淘汰最旧的一半条目，保留最近的 */
     private cleanup;
 }
 //# sourceMappingURL=conversation_sync.d.ts.map

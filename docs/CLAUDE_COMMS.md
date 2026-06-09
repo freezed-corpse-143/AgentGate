@@ -78,7 +78,7 @@ Claude A user says:
 |------|-------|
 | OS | Windows 11 |
 | Claude Version | deepseek-v4-pro (claude.exe, 234MB Bun-compiled) |
-| Launch Method | `claude --dangerously-load-development-channels server:agentgate` |
+| Launch Method | `claude --plugin-dir /path/to/AgentGate` |
 | Agent ID delivery | File `~/.agentgate/agent_id` (env vars not passed to MCP subprocess) |
 | Bridge Port | 8444 (auto-networking: first starter = hub, subsequent = peers) |
 | MCP SDK | `@modelcontextprotocol/sdk@^1.29.0` |
@@ -107,14 +107,14 @@ Claude A user says:
 ```powershell
 # Terminal A
 echo agent-alpha > $env:USERPROFILE\.agentgate\agent_id
-claude --dangerously-load-development-channels server:agentgate
+claude --plugin-dir /path/to/AgentGate
 
 # In Claude A:
 # "Use send_message to send a message to agent-beta with text 'Hello'"
 
 # Terminal B
 echo agent-beta > $env:USERPROFILE\.agentgate\agent_id
-claude --dangerously-load-development-channels server:agentgate
+claude --plugin-dir /path/to/AgentGate
 
 # In Claude B:
 # "List recent conversations" → will see the new conversation
@@ -399,7 +399,7 @@ npm run build
 echo agent-alpha > $env:USERPROFILE\.agentgate\agent_id
 
 # Start Claude
-claude --dangerously-load-development-channels server:agentgate
+claude --plugin-dir /path/to/AgentGate
 
 # Test MCP server standalone
 node dist/mcp_server.js

@@ -9,6 +9,7 @@
  *   PeerManager     — 管理直连 TCP，按 topic 路由消息
  */
 import * as net from 'net';
+import { createHmac } from 'crypto';
 import { RetryQueue } from './retry_queue.js';
 // ─── 常量 ──────────────────────────────────────────
 const DEFAULT_REGISTRY_PORT = 8444;
@@ -16,6 +17,25 @@ const HEARTBEAT_INTERVAL = 15_000; // peer 心跳间隔
 const HEARTBEAT_TIMEOUT = 60_000; // 心跳超时断开
 const PEER_RECONNECT_DELAY = 3_000; // 断线重连延迟
 const SEEN_SET_MAX = 5000;
+const REGISTRY_SECRET = process.env.AGENTGATE_REGISTRY_SECRET;
+/** HMAC 签名：agent_id + timestamp → hex */
+function signRegister(agentId, ts) {
+    return createHmac('sha256', REGISTRY_SECRET).update(`${agentId}:${ts}`).digest('hex');
+}
+/** 验证签名：对比 HMAC，constant-time 防时序攻击 */
+function verifySignature(agentId, ts, signature) {
+    if (!REGISTRY_SECRET)
+        return true; // 未配置密钥时跳过验证
+    const expected = signRegister(agentId, ts);
+    // 简易 constant-time 比较
+    if (expected.length !== signature.length)
+        return false;
+    let diff = 0;
+    for (let i = 0; i < expected.length; i++) {
+        diff |= expected.charCodeAt(i) ^ (signature.charCodeAt(i) || 0);
+    }
+    return diff === 0;
+}
 // ─── 协议编解码 ──────────────────────────────────
 function encode(msg) {
     return Buffer.from(JSON.stringify(msg) + '\n', 'utf8');
@@ -96,6 +116,20 @@ export class RegistryServer {
     }
     handleMsg(conn, msg, onRegistered) {
         if (msg.type === 'register') {
+            // 签名验证（如果配置了 AGENTGATE_REGISTRY_SECRET）
+            if (REGISTRY_SECRET && msg.signature) {
+                if (!verifySignature(msg.agent_id, msg.ts, msg.signature)) {
+                    this.send(conn.socket, { type: 'register_nack', agent_id: msg.agent_id, reason: 'Invalid signature' });
+                    conn.socket.destroy();
+                    return;
+                }
+            }
+            else if (REGISTRY_SECRET && !msg.signature) {
+                // 需要签名但未提供 → 拒绝
+                this.send(conn.socket, { type: 'register_nack', agent_id: msg.agent_id, reason: 'Signature required' });
+                conn.socket.destroy();
+                return;
+            }
             conn.agent_id = msg.agent_id;
             conn.port = msg.port;
             const info = { agent_id: msg.agent_id, host: msg.host, port: msg.port, seen_at: msg.ts };
@@ -291,12 +325,17 @@ export class BridgeAgent {
                 this.registrySocket = s;
                 this.registryConnected = true;
                 this.setupRegistryIO(s);
-                // 发送 REGISTER
-                this.sendToRegistry({
+                // 发送 REGISTER（含签名，如果配置了密钥）
+                const regTs = new Date().toISOString();
+                const regMsg = {
                     type: 'register', agent_id: this.agentId,
                     host: this.advertiseHost, port: this.actualPort,
-                    ts: new Date().toISOString(),
-                });
+                    ts: regTs,
+                };
+                if (REGISTRY_SECRET) {
+                    regMsg.signature = signRegister(this.agentId, regTs);
+                }
+                this.sendToRegistry(regMsg);
                 resolve(true);
             });
             s.on('error', () => { clearTimeout(timer); s.destroy(); resolve(false); });
@@ -330,6 +369,12 @@ export class BridgeAgent {
             for (const peer of msg.peers) {
                 this.connectToPeer(peer);
             }
+        }
+        else if (msg.type === 'register_nack') {
+            console.error(`[Bridge] Registry rejected registration: ${msg.reason}`);
+            this.registrySocket?.destroy();
+            this.registrySocket = null;
+            this.registryConnected = false;
         }
         else if (msg.type === 'peer_join') {
             // 新 agent 上线 → 建立直连

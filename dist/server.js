@@ -22,7 +22,7 @@ export async function startServer(config, opts) {
     const bindingStore = new BindingStore();
     const sessionRegistry = new SessionRegistry();
     const handshake = new HandshakeManager(bindingStore);
-    const conversationStore = new ConversationStore();
+    const conversationStore = new ConversationStore(config.server.defaultAgent);
     const bus = new MemoryBus();
     const agentRegistry = new AgentRegistry();
     const router = new SessionRouter(bindingStore, agentRegistry, sessionRegistry);

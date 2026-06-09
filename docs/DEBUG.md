@@ -21,11 +21,11 @@
 ```powershell
 # Terminal A — agent-alpha
 $env:AGENTGATE_DEFAULT_AGENT = "agent-alpha"
-claude --dangerously-load-development-channels server:agentgate
+claude --plugin-dir /path/to/AgentGate
 
 # Terminal B — agent-beta
 $env:AGENTGATE_DEFAULT_AGENT = "agent-beta"
-claude --dangerously-load-development-channels server:agentgate
+claude --plugin-dir /path/to/AgentGate
 ```
 
 > `~/.claude.json` must have `mcpServers.agentgate` configured, args including `--agent-id ${AGENTGATE_DEFAULT_AGENT}`.
@@ -381,5 +381,5 @@ npm run build
 echo agent-alpha > $env:USERPROFILE\.agentgate\agent_id
 
 # 6. Start Claude
-claude --dangerously-load-development-channels server:agentgate
+claude --plugin-dir /path/to/AgentGate
 ```

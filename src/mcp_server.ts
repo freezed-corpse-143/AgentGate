@@ -8,13 +8,13 @@ import { ConversationSync } from './storage/conversation_sync.js'
 import { loadConfig } from './config.js'
 import type { Envelope } from './types.js'
 
-// Agent ID ½âÎöÓÅÏÈ¼¶£ºCLI ²ÎÊý --agent-id > ÎÄ¼þ ~/.agentgate/agent_id
-// Á½¸ö Claude ÊµÀý¿ÉÔÚ mcpServers ÖÐÓÃ²»Í¬ args Çø·ÖÉí·Ý
-import { readFileSync, existsSync, mkdirSync } from 'fs'
+// Agent ID ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È¼ï¿½ï¿½ï¿½CLI ï¿½ï¿½ï¿½ï¿½ --agent-id > ï¿½Ä¼ï¿½ ~/.agentgate/agent_id
+// ï¿½ï¿½ï¿½ï¿½ Claude Êµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ mcpServers ï¿½ï¿½ï¿½Ã²ï¿½Í¬ args ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
 import { homedir } from 'os'
 import { join } from 'path'
 
-// ½âÎö CLI ²ÎÊý --agent-id <value>
+// ï¿½ï¿½ï¿½ï¿½ CLI ï¿½ï¿½ï¿½ï¿½ --agent-id <value>
 const agentIdArgIndex = process.argv.indexOf('--agent-id')
 const cliAgentId = agentIdArgIndex !== -1 ? process.argv[agentIdArgIndex + 1] : undefined
 
@@ -24,7 +24,13 @@ if (cliAgentId) {
 } else {
   const AGENT_ID_FILE = join(process.env.AGENTGATE_DIR ?? join(homedir(), '.agentgate'), 'agent_id')
   myAgentId = 'default'
-  try { mkdirSync(join(homedir(), '.agentgate'), { recursive: true }); if (existsSync(AGENT_ID_FILE)) { myAgentId = readFileSync(AGENT_ID_FILE, 'utf8').trim() } } catch {}
+  try {
+    mkdirSync(join(homedir(), '.agentgate'), { recursive: true })
+    if (existsSync(AGENT_ID_FILE)) {
+      myAgentId = readFileSync(AGENT_ID_FILE, 'utf8').trim()
+      console.error(`[AgentGate] Reading agent_id from file is deprecated. Use --agent-id \${AGENTGATE_DEFAULT_AGENT} in ~/.claude.json args instead.`)
+    }
+  } catch {}
 }
 
 const myBridgePort = parseInt(process.env.AGENTGATE_BRIDGE_PORT ?? '0', 10)
@@ -39,7 +45,7 @@ if (myAgentId !== 'default') {
 
 const { bus, conversationStore, shutdown: coreShutdown } = await startServer(config, { headless: true })
 
-// ©¤©¤©¤ Bridge v2 ¡ª ×¢²á + P2P Ö±Á¬ ©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤
+// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ Bridge v2 ï¿½ï¿½ ×¢ï¿½ï¿½ + P2P Ö±ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 let bridge: BridgeAgent | null = null
 let conversationSync: ConversationSync | null = null
 
@@ -58,7 +64,7 @@ if (bridgeEnabled) {
   conversationSync = new ConversationSync(bus, conversationStore)
 }
 
-// ©¤©¤©¤ MCP Server ©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤
+// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ MCP Server ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 const mcp = new Server(
   { name: 'agentgate', version: '0.1.0' },
   {
@@ -75,14 +81,68 @@ const mcp = new Server(
   },
 )
 
-// ©¤©¤©¤ ´ý´¦ÀíÏûÏ¢¶ÓÁÐ ©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤
+// â”€â”€â”€ Push mode â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const PUSH_MODE = (process.env.AGENTGATE_PUSH_MODE ?? 'pull') as 'pull' | 'poll' | 'off'
+
+// â”€â”€â”€ Pairing (agent-to-agent trust) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+interface PendingPair {
+  code: string
+  agentId: string
+  expiresAt: number
+}
+const PAIRING_FILE = join(process.env.AGENTGATE_DIR ?? join(homedir(), '.agentgate'), 'pending_pairings.json')
+const VERIFIED_PEERS_FILE = join(process.env.AGENTGATE_DIR ?? join(homedir(), '.agentgate'), 'verified_peers.json')
+
+function loadPairings(): Map<string, PendingPair> {
+  const map = new Map<string, PendingPair>()
+  try {
+    if (existsSync(PAIRING_FILE)) {
+      const entries = JSON.parse(readFileSync(PAIRING_FILE, 'utf8')) as PendingPair[]
+      const now = Date.now()
+      for (const p of entries) {
+        if (p.expiresAt > now) map.set(p.code, p)
+      }
+    }
+  } catch {}
+  return map
+}
+
+function savePairings(pairings: Map<string, PendingPair>): void {
+  const dir = process.env.AGENTGATE_DIR ?? join(homedir(), '.agentgate')
+  mkdirSync(dir, { recursive: true })
+  const entries = Array.from(pairings.values())
+  writeFileSync(PAIRING_FILE, JSON.stringify(entries, null, 2))
+}
+
+function loadVerifiedPeers(): string[] {
+  try {
+    if (existsSync(VERIFIED_PEERS_FILE)) {
+      return JSON.parse(readFileSync(VERIFIED_PEERS_FILE, 'utf8')) as string[]
+    }
+  } catch {}
+  return []
+}
+
+function saveVerifiedPeer(peerAgentId: string): void {
+  const peers = loadVerifiedPeers()
+  if (!peers.includes(peerAgentId)) {
+    peers.push(peerAgentId)
+    const dir = process.env.AGENTGATE_DIR ?? join(homedir(), '.agentgate')
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(VERIFIED_PEERS_FILE, JSON.stringify(peers, null, 2))
+  }
+}
+
+// â”€â”€â”€ Pending messages queue â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const pendingMessages: Array<{ from: string; text: string; conv_id: string }> = []
+let totalReceivedCount = 0  // ç´¯è®¡æŽ¥æ”¶æ¶ˆæ¯æ•°ï¼ˆå•è°ƒé€’å¢žï¼Œä¸éš drain æ¸…é›¶ï¼‰
 
 bus.subscribeWildcard('agent.*.inbound', (envelope: Envelope) => {
   const agentId = config.server.defaultAgent
   if (envelope.agent_id !== agentId) return
   const text = envelope.payload.text ?? ''
   pendingMessages.push({ from: envelope.channel_user_id, text, conv_id: envelope.conversation_id })
+  totalReceivedCount++
   conversationStore.appendMessage({
     message_id: envelope.message_id,
     conversation_id: envelope.conversation_id,
@@ -90,32 +150,44 @@ bus.subscribeWildcard('agent.*.inbound', (envelope: Envelope) => {
     channel: envelope.channel, channel_user_id: envelope.channel_user_id,
     timestamp: envelope.timestamp, metadata: { trace_id: envelope.trace_id },
   })
-  mcp.notification({
-    method: 'notifications/claude/channel',
-    params: {
-      content: text,
-      meta: {
-        chat_id: envelope.channel_user_id,
-        message_id: envelope.message_id,
-        user: envelope.channel_user_id,
-        user_id: envelope.channel_user_id,
-        agent_id: envelope.agent_id,
-        conversation_id: envelope.conversation_id,
-        trace_id: envelope.trace_id,
-        source: envelope.channel,
-        ts: envelope.timestamp,
+  // Attempt channel push (known limitation: may not display in all Claude versions)
+  if (PUSH_MODE !== 'off') {
+    mcp.notification({
+      method: 'notifications/claude/channel',
+      params: {
+        content: text,
+        meta: {
+          chat_id: envelope.channel_user_id,
+          message_id: envelope.message_id,
+          user: envelope.channel_user_id,
+          user_id: envelope.channel_user_id,
+          agent_id: envelope.agent_id,
+          conversation_id: envelope.conversation_id,
+          trace_id: envelope.trace_id,
+          source: envelope.channel,
+          ts: envelope.timestamp,
+        },
       },
-    },
-  }).catch((err: unknown) => {
-    process.stderr.write(`[AgentGate MCP] channel notification failed: ${err}\n`)
-  })
+    }).catch((err: unknown) => {
+      process.stderr.write(`[AgentGate MCP] channel notification failed: ${err}\n`)
+    })
+  }
 })
 
-// ©¤©¤©¤ ¹¤¾ß ©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤
+// â”€â”€â”€ Drain pending messages (pull-based) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function drainPending(context: string): string {
-  if (pendingMessages.length === 0) return context
-  const notes = pendingMessages.map(p => `  ”9å0 ${p.from}: "${p.text.slice(0, 60)}" (conv: ${p.conv_id})`)
-  const result = `${context}\n\n---\n”9á0 ´ý´¦ÀíÏûÏ¢ (${pendingMessages.length}):\n${notes.join('\n')}`
+  const count = pendingMessages.length
+  if (count === 0) {
+    // æ— æ¶ˆæ¯æ—¶ä¹Ÿä¸æ·»åŠ å™ªå£°ï¼Œä¿æŒå·¥å…·å“åº”ç®€æ´
+    return context
+  }
+  // æœ‰æ¶ˆæ¯æ—¶ï¼šé†’ç›®çš„é€šçŸ¥å¤´éƒ¨
+  const header = `\n\nðŸ“¬ â”€â”€ ${count} NEW MESSAGE${count > 1 ? 'S' : ''} â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€`
+  const notes = pendingMessages.map(p =>
+    `  ðŸ”” ${p.from}: "${p.text.slice(0, 80)}${p.text.length > 80 ? '...' : ''}"\n     conv: ${p.conv_id}`
+  )
+  const footer = `â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€\nUse reply or send_message to respond.`
+  const result = `${context}${header}\n${notes.join('\n')}\n${footer}`
   pendingMessages.length = 0
   return result
 }
@@ -169,6 +241,21 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       description: 'Edit a previously sent reply.',
       inputSchema: { type: 'object', properties: { conv_id: { type: 'string' }, text: { type: 'string' } }, required: ['conv_id', 'text'] },
     },
+    {
+      name: 'get_status',
+      description: 'Check AgentGate system status: pending messages, connected peers, push mode.',
+      inputSchema: { type: 'object', properties: {} },
+    },
+    {
+      name: 'request_pairing',
+      description: 'Generate a pairing code for another agent to verify. Share the code with the other agent.',
+      inputSchema: { type: 'object', properties: {} },
+    },
+    {
+      name: 'verify_pairing',
+      description: 'Verify a pairing code from another agent to establish trusted communication.',
+      inputSchema: { type: 'object', properties: { code: { type: 'string', description: '6-digit pairing code from the other agent.' } }, required: ['code'] },
+    },
   ],
 }))
 
@@ -202,7 +289,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       const convId = args.conv_id as string
       const msgs = conversationStore.getMessages(convId, { limit: 1 })
       const original = msgs[0]
-      // ÍÆ¶Ï»Ø¸´Ä¿±ê: ÏÔÊ½ target_agent_id > Ô­·¢ËÍÕß(channel_user_id) > Ô­ËùÓÐÕß(agent_id) > ×ÔÉí
+      // ï¿½Æ¶Ï»Ø¸ï¿½Ä¿ï¿½ï¿½: ï¿½ï¿½Ê½ target_agent_id > Ô­ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½(channel_user_id) > Ô­ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½(agent_id) > ï¿½ï¿½ï¿½ï¿½
       const senderId = original?.channel_user_id || original?.agent_id
       const replyTarget = (args.target_agent_id as string | undefined) || senderId
       const response: Envelope = {
@@ -221,10 +308,10 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         timestamp: response.timestamp, metadata: { trace_id: response.trace_id },
       })
       if (replyTarget && replyTarget !== config.server.defaultAgent) {
-        // ¿çÊµÀý»Ø¸´: Í¨¹ý Bridge ×ª·¢µ½Ä¿±ê agent µÄ inbound topic
+        // ï¿½ï¿½Êµï¿½ï¿½ï¿½Ø¸ï¿½: Í¨ï¿½ï¿½ Bridge ×ªï¿½ï¿½ï¿½ï¿½Ä¿ï¿½ï¿½ agent ï¿½ï¿½ inbound topic
         bus.publish(`agent.${replyTarget}.inbound`, response)
       } else {
-        // ±¾µØ»Ø¸´: ×ß outbound ÐÅµÀ
+        // ï¿½ï¿½ï¿½Ø»Ø¸ï¿½: ï¿½ï¿½ outbound ï¿½Åµï¿½
         bus.publish(`agent.${config.server.defaultAgent}.outbound`, response)
       }
       return { content: [{ type: 'text', text: drainPending(`replied to ${convId}`) }] }
@@ -239,18 +326,105 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       return { content: [{ type: 'text', text: drainPending(result) }] }
     }
 
-    case 'react':
-      return { content: [{ type: 'text', text: drainPending(`reacted ${args.emoji}`) }] }
+    case 'react': {
+      const reactEmoji = args.emoji as string
+      const reactConvId = args.conv_id as string
+      // æ‰¾åˆ°è¯¥å¯¹è¯ä¸­æœ€è¿‘çš„ä¸€æ¡æ¶ˆæ¯å¹¶æ·»åŠ ååº”
+      const reactMsgs = conversationStore.getMessages(reactConvId, { limit: 1 })
+      const lastMsg = reactMsgs[0]
+      if (lastMsg) {
+        conversationStore.addReaction(reactConvId, lastMsg.message_id, reactEmoji, config.server.defaultAgent)
+      }
+      return { content: [{ type: 'text', text: drainPending(`reacted ${reactEmoji} to ${reactConvId}`) }] }
+    }
 
-    case 'edit_message':
-      return { content: [{ type: 'text', text: drainPending(`edited ${args.conv_id}`) }] }
+    case 'edit_message': {
+      const editText = args.text as string
+      const editConvId = args.conv_id as string
+      // æ‰¾åˆ°å½“å‰ agent åœ¨è¯¥å¯¹è¯ä¸­å‘é€çš„æœ€è¿‘ä¸€æ¡æ¶ˆæ¯
+      const editMsgs = conversationStore.getMessages(editConvId)
+      const lastOwnMsg = editMsgs.reverse().find(
+        (m: any) => m.channel_user_id === config.server.defaultAgent
+      )
+      if (lastOwnMsg && conversationStore.updateMessage(editConvId, lastOwnMsg.message_id, editText)) {
+        return { content: [{ type: 'text', text: drainPending(`edited ${editConvId}: "${editText.slice(0, 80)}"`) }] }
+      }
+      return { content: [{ type: 'text', text: drainPending(`edit failed: no own message found in ${editConvId}`) }] }
+    }
+
+    case 'get_status': {
+      const convs = conversationStore.listConversations()
+      const totalMsgs = convs.reduce((sum: number, c: any) => sum + c.message_count, 0)
+      const status = [
+        `AgentGate Status`,
+        `â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€`,
+        `Agent: ${config.server.defaultAgent}`,
+        `Push mode: ${PUSH_MODE}`,
+        `Pending messages: ${pendingMessages.length}`,
+        `Total received: ${totalReceivedCount}`,
+        `Conversations: ${convs.length}`,
+        `Total messages: ${totalMsgs}`,
+        ``,
+        `Bridge: ${bridge ? 'connected' : 'disabled'}`,
+        `Registry: ${process.env.AGENTGATE_REGISTRY_HOST ?? '127.0.0.1'}:${process.env.AGENTGATE_REGISTRY_PORT ?? '8444'}`,
+      ].join('\n')
+      return { content: [{ type: 'text', text: drainPending(status) }] }
+    }
+
+    case 'request_pairing': {
+      // ç”Ÿæˆ 6 ä½æ•°å­—é…å¯¹ç ï¼Œæœ‰æ•ˆæœŸ 5 åˆ†é’Ÿï¼ˆæŒä¹…åŒ–åˆ°ç£ç›˜ï¼‰
+      const code = String(Math.floor(100000 + Math.random() * 900000))
+      const myId = config.server.defaultAgent
+      const pairings = loadPairings()
+      pairings.set(code, {
+        code,
+        agentId: myId,
+        expiresAt: Date.now() + 5 * 60 * 1000,
+      })
+      savePairings(pairings)
+      const verifiedPeers = loadVerifiedPeers()
+      const result = [
+        `ðŸ” Pairing Code: ${code}`,
+        `Agent: ${myId}`,
+        `Expires: 5 minutes`,
+        ``,
+        `Share this code with the other agent.`,
+        `They should use verify_pairing with this code.`,
+        ``,
+        `Already verified peers: ${verifiedPeers.length > 0 ? verifiedPeers.join(', ') : '(none)'}`,
+      ].join('\n')
+      return { content: [{ type: 'text', text: drainPending(result) }] }
+    }
+
+    case 'verify_pairing': {
+      const code = args.code as string
+      const pairings = loadPairings()
+      const pending = pairings.get(code)
+      if (!pending || pending.expiresAt < Date.now()) {
+        if (pending) { pairings.delete(code); savePairings(pairings) }
+        return { content: [{ type: 'text', text: drainPending(`âŒ Invalid or expired pairing code: ${code}`) }] }
+      }
+      // åŒå‘ä¿å­˜éªŒè¯å…³ç³»
+      const myId = config.server.defaultAgent
+      saveVerifiedPeer(pending.agentId)
+      pairings.delete(code)
+      savePairings(pairings)
+      const result = [
+        `âœ… Pairing verified!`,
+        `Now trusted with agent: ${pending.agentId}`,
+        `Your agent: ${myId}`,
+        ``,
+        `Note: The other agent should also verify your pairing code for mutual trust.`,
+      ].join('\n')
+      return { content: [{ type: 'text', text: drainPending(result) }] }
+    }
 
     default:
       return { content: [{ type: 'text', text: drainPending(`unknown tool: ${req.params.name}`) }], isError: true }
   }
 })
 
-// ©¤©¤©¤ ÓÅÑÅ¹Ø±Õ ©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤
+// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Å¹Ø±ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 let shuttingDown = false
 function gracefulShutdown(): void {
   if (shuttingDown) return; shuttingDown = true

@@ -86,6 +86,52 @@ program
         console.log(`    - ${c.conversation_id}: ${c.message_count} msgs`);
     }
 });
+// ─── health ──────────────────────────────────────────────────
+program
+    .command('health')
+    .description('Check AgentGate system health (peers, messages, storage)')
+    .option('--json', 'Output as JSON')
+    .action(async (opts) => {
+    const { ConversationStore } = await import('./storage/conversation_store.js');
+    const store = new ConversationStore();
+    const convs = store.listConversations();
+    const totalMsgs = convs.reduce((s, c) => s + c.message_count, 0);
+    // Check bridge ports
+    let registryStatus = 'unknown';
+    const registryPort = parseInt(process.env.AGENTGATE_REGISTRY_PORT ?? '8444', 10);
+    try {
+        const { execSync } = await import('child_process');
+        const out = execSync(`ss -tlnp | grep ":${registryPort} " || echo "not listening"`, { encoding: 'utf8', timeout: 3000 });
+        registryStatus = out.includes('LISTEN') ? 'listening' : 'not listening';
+    }
+    catch {
+        registryStatus = 'check failed';
+    }
+    if (opts.json) {
+        console.log(JSON.stringify({
+            registry: { port: registryPort, status: registryStatus },
+            push_mode: process.env.AGENTGATE_PUSH_MODE ?? 'pull',
+            conversations: convs.length,
+            total_messages: totalMsgs,
+            storage_dir: process.env.AGENTGATE_DIR ?? '~/.agentgate',
+        }, null, 2));
+    }
+    else {
+        console.log('AgentGate Health');
+        console.log('═'.repeat(40));
+        console.log(`  Registry   : ${registryPort} (${registryStatus})`);
+        console.log(`  Push mode  : ${process.env.AGENTGATE_PUSH_MODE ?? 'pull'}`);
+        console.log(`  Storage    : ${process.env.AGENTGATE_DIR ?? '~/.agentgate'}`);
+        console.log(`  Conversations: ${convs.length}`);
+        console.log(`  Total messages: ${totalMsgs}`);
+        if (convs.length > 0) {
+            console.log(`  Recent:`);
+            for (const c of convs.slice(0, 5)) {
+                console.log(`    ${c.conversation_id}: ${c.agent_id}, ${c.message_count} msgs, ${c.last_active_at.slice(0, 19)}`);
+            }
+        }
+    }
+});
 // ─── bridge ──────────────────────────────────────────────────
 program
     .command('bridge')
