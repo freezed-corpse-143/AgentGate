@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "agentgate": {
+      "command": "node",
+      "args": [
+        "${CLAUDE_PLUGIN_ROOT}/dist/mcp_server.js",
+        "--agent-id",
+        "${AGENTGATE_DEFAULT_AGENT}"
+      ]
+    }
+  }
+}
