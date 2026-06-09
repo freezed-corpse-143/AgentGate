@@ -265,7 +265,7 @@ interface MessageRecord {
 | BUG-09 | 🟢 low | Redundant agent_id file | S | ✅ fixed |
 | BUG-10 | 🟢 low | Edit history | M | ✅ fixed |
 | BUG-11 | 🟢 low | Health check CLI | M | ✅ fixed |
-| BUG-12 | 🟠 medium | Edits not synced | M | [ ] new |
+| BUG-12 | 🟠 medium | Edits not synced | M | ✅ fixed |
 | BUG-13 | 🟢 low | Stale agentgate-plugin/ | S | ✅ fixed |
 
 **Key:** S = hours, M = days, L = weeks (research required)
